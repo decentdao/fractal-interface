@@ -18,6 +18,7 @@ import {
   getProxyFactoryDeployment,
   getSafeSingletonDeployment,
 } from '@safe-global/safe-deployments';
+import { ethers } from 'ethers';
 import { goerli } from 'wagmi/chains';
 import { GovernanceType } from '../../../types';
 import { NetworkConfig } from '../../../types/network';
@@ -25,6 +26,7 @@ import { NetworkConfig } from '../../../types/network';
 const CHAIN_ID = 5;
 const SAFE_VERSION = '1.3.0';
 
+export const WETH_CONTRACT_ADDRESS = '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6';
 export const goerliConfig: NetworkConfig = {
   safeBaseURL: 'https://safe-transaction-goerli.safe.global',
   etherscanBaseURL: 'https://goerli.etherscan.io',
@@ -68,6 +70,7 @@ export const goerliConfig: NetworkConfig = {
       rewardsAddress: '0xD26c85D435F02DaB8B220cd4D2d398f6f646e235',
       stETHContractAddress: '0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F',
       withdrawalQueueContractAddress: '0xCF117961421cA9e546cD7f50bC73abCdB3039533',
+      supportedAssets: [ethers.constants.AddressZero, WETH_CONTRACT_ADDRESS],
     },
   },
   createOptions: [

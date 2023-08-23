@@ -2,7 +2,7 @@ import { Box, Button, Divider, HStack, Image, Text, Tooltip } from '@chakra-ui/r
 import { getWithdrawalQueueContract } from '@lido-sdk/contracts';
 import { SafeCollectibleResponse } from '@safe-global/safe-service-client';
 import { ethers, BigNumber } from 'ethers';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSubmitProposal from '../../../../hooks/DAO/proposal/useSubmitProposal';
 import useLidoStaking from '../../../../hooks/stake/lido/useLidoStaking';
@@ -219,15 +219,26 @@ export function Assets() {
   const { staking } = useNetworkConfig();
   const { t } = useTranslation('treasury');
   const coinDisplay = useFormatCoins(assetsFungible);
-  const ethAsset = assetsFungible.find(asset => !asset.tokenAddress);
   const { handleUnstake, handleClaimUnstakedETH } = useLidoStaking();
 
   // --- Lido Stake button setup ---
+  const fungibleAssetsWithBalance = assetsFungible.filter(asset => parseFloat(asset.balance) > 0);
+  const supportedAssetsWithBalance = fungibleAssetsWithBalance.filter(asset => {
+    {
+      let address = asset.tokenAddress;
+      if (!asset.tokenAddress) {
+        address = ethers.constants.AddressZero;
+      }
+      return (
+        staking.lido?.supportedAssets.includes(address) ||
+        staking.yearn?.supportedAssets.includes(address)
+      );
+    }
+  });
   const showStakeButton =
     canUserCreateProposal &&
     Object.keys(staking).length > 0 &&
-    ethAsset &&
-    BigNumber.from(ethAsset.balance).gt(0);
+    supportedAssetsWithBalance.length > 0;
   const openStakingModal = useFractalModal(ModalType.STAKE);
 
   // --- Lido Unstake button setup ---
@@ -242,13 +253,16 @@ export function Assets() {
   // --- Lido Claim ETH button setup ---
   const signerOrProvider = useSignerOrProvider();
   const [isLidoClaimable, setIsLidoClaimable] = useState(false);
-  const lidoWithdrawelNFT = assetsNonFungible.find(
+  const lidoWithdrawalNFT = assetsNonFungible.find(
     asset => asset.address === staking.lido?.withdrawalQueueContractAddress
   );
-  const showClaimETHButton = canUserCreateProposal && staking.lido && lidoWithdrawelNFT;
+  const showClaimETHButton = useMemo(
+    () => canUserCreateProposal && staking.lido && lidoWithdrawalNFT,
+    [canUserCreateProposal, staking.lido, lidoWithdrawalNFT]
+  );
   useEffect(() => {
     const getLidoClaimableStatus = async () => {
-      if (!staking.lido?.withdrawalQueueContractAddress) {
+      if (!staking.lido?.withdrawalQueueContractAddress || !showClaimETHButton) {
         return;
       }
       const withdrawalQueueContract = getWithdrawalQueueContract(
@@ -256,7 +270,7 @@ export function Assets() {
         signerOrProvider
       );
       const claimableStatus = (
-        await withdrawalQueueContract.getWithdrawalStatus([lidoWithdrawelNFT!.id])
+        await withdrawalQueueContract.getWithdrawalStatus([lidoWithdrawalNFT!.id])
       )[0]; // Since we're checking for the single NFT - we can grab first array element
       if (claimableStatus.isFinalized !== isLidoClaimable) {
         setIsLidoClaimable(claimableStatus.isFinalized);
@@ -264,9 +278,10 @@ export function Assets() {
     };
 
     getLidoClaimableStatus();
-  }, [staking, isLidoClaimable, signerOrProvider, lidoWithdrawelNFT]);
+  }, [staking, isLidoClaimable, signerOrProvider, lidoWithdrawalNFT, showClaimETHButton]);
+
   const handleClickClaimButton = () => {
-    handleClaimUnstakedETH(BigNumber.from(lidoWithdrawelNFT!.id));
+    handleClaimUnstakedETH(BigNumber.from(lidoWithdrawalNFT!.id));
   };
 
   return (

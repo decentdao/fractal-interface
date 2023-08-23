@@ -1,4 +1,7 @@
 {
-    "stakeAmount": "ETH Amount",
-    "submitStakingProposal": "Submit staking proposal"
+    "selectProviderLabel": "Select Staking Provider",
+    "stakeAmount": "{{symbol}} Amount",
+    "submitStakingProposal": "Submit staking proposal",
+    "lido": "Lido",
+    "yearn": "Yearn Finance"
 }

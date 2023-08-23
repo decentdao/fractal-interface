@@ -16,6 +16,7 @@ import {
   getProxyFactoryDeployment,
   getMultiSendCallOnlyDeployment,
 } from '@safe-global/safe-deployments';
+import { ethers } from 'ethers';
 import { mainnet } from 'wagmi/chains';
 import { GovernanceType } from '../../../types';
 import { NetworkConfig } from '../../../types/network';
@@ -23,6 +24,9 @@ import { isProd } from '../../../utils';
 
 const CHAIN_ID = 1;
 const SAFE_VERSION = '1.3.0';
+
+export const WETH_CONTRACT_ADDRESS = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
+export const USDC_CONTRACT_ADDRESS = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
 
 export const mainnetConfig: NetworkConfig = {
   safeBaseURL: 'https://safe-transaction-mainnet.safe.global',
@@ -67,6 +71,11 @@ export const mainnetConfig: NetworkConfig = {
       rewardsAddress: '0x8202E3cBa328CCf3eeA5bF0A11596c5297Cf7525',
       stETHContractAddress: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84',
       withdrawalQueueContractAddress: '0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1',
+      supportedAssets: [ethers.constants.AddressZero, WETH_CONTRACT_ADDRESS],
+    },
+    yearn: {
+      apiURL: 'https://api.yearn.finance/v1/chains/1/vaults/all',
+      supportedAssets: [USDC_CONTRACT_ADDRESS],
     },
   },
   createOptions: isProd()

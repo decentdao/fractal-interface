@@ -7,6 +7,9 @@ export type Providers =
   | ethers.providers.JsonRpcProvider
   | ethers.providers.BaseProvider;
 
+export type StakingProviderNetworkConfig = {
+  supportedAssets: string[];
+};
 export type NetworkConfig = {
   safeBaseURL: string;
   etherscanBaseURL: string;
@@ -43,7 +46,10 @@ export type NetworkConfig = {
       stETHContractAddress: string;
       rewardsAddress: string;
       withdrawalQueueContractAddress: string;
-    };
+    } & StakingProviderNetworkConfig;
+    yearn?: {
+      apiURL: string;
+    } & StakingProviderNetworkConfig;
   };
   createOptions: GovernanceType[];
 };
