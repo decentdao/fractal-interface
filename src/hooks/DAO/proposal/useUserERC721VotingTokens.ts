@@ -125,8 +125,14 @@ export default function useUserERC721VotingTokens(
             client: publicClient,
           });
           if ((await tokenContract.read.balanceOf([userAddress])) > 0n) {
-            const tokenSentEvents = await tokenContract.getEvents.Transfer({ from: userAddress });
-            const tokenReceivedEvents = await tokenContract.getEvents.Transfer({ to: userAddress });
+            const tokenSentEvents = await tokenContract.getEvents.Transfer(
+              { from: userAddress },
+              { fromBlock: 0n },
+            );
+            const tokenReceivedEvents = await tokenContract.getEvents.Transfer(
+              { to: userAddress },
+              { fromBlock: 0n },
+            );
 
             const allEvents = tokenSentEvents
               .concat(tokenReceivedEvents)

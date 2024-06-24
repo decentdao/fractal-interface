@@ -33,8 +33,8 @@ export default function useERC721Tokens() {
         const [name, symbol, tokenMintEvents, tokenBurnEvents] = await Promise.all([
           tokenContract.read.name(),
           tokenContract.read.symbol(),
-          tokenContract.getEvents.Transfer({ from: zeroAddress }),
-          tokenContract.getEvents.Transfer({ to: zeroAddress }),
+          tokenContract.getEvents.Transfer({ from: zeroAddress }, { fromBlock: 0n }),
+          tokenContract.getEvents.Transfer({ to: zeroAddress }, { fromBlock: 0n }),
         ]);
         const totalSupply = BigInt(tokenMintEvents.length - tokenBurnEvents.length);
         return { name, symbol, address: address, votingWeight, totalSupply };

@@ -26,17 +26,20 @@ const useVotingStrategyAddress = () => {
         const safeInfo = await safeAPI.getSafeInfo(safeAddress);
         const safeModules = await lookupModules(safeInfo.modules);
         azoriusModule = getAzoriusModuleFromModules(safeModules);
-        if (!azoriusModule) return;
       } else {
         azoriusModule = getAzoriusModuleFromModules(node.fractalModules);
       }
 
-      if (!azoriusModule) {
-        throw new Error('Azorius module not found');
-      }
+      // if (!azoriusModule) {
+      //   throw new Error('Azorius module not found');
+      // }
 
-      if (!publicClient) {
-        throw new Error('Public client undefined');
+      // if (!publicClient) {
+      //   throw new Error('Public client undefined');
+      // }
+
+      if (!azoriusModule || !publicClient) {
+        return;
       }
 
       const azoriusContract = getContract({

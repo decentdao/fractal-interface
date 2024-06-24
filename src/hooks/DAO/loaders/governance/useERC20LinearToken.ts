@@ -17,17 +17,17 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
   const account = user.address;
   const publicClient = usePublicClient();
 
-  const tokenContract = useMemo(() => {
-    if (!votesTokenAddress || !publicClient) {
-      return;
-    }
+  // const tokenContract = useMemo(() => {
+  //   if (!votesTokenAddress || !publicClient) {
+  //     return;
+  //   }
 
-    return getContract({
-      abi: abis.VotesERC20,
-      address: votesTokenAddress,
-      client: publicClient,
-    });
-  }, [publicClient, votesTokenAddress]);
+  //   return getContract({
+  //     abi: abis.VotesERC20,
+  //     address: votesTokenAddress,
+  //     client: publicClient,
+  //   });
+  // }, [publicClient, votesTokenAddress]);
 
   const underlyingTokenContract = useMemo(() => {
     if (!underlyingTokenAddress || !publicClient) {
@@ -42,9 +42,15 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
   }, [publicClient, underlyingTokenAddress]);
 
   const loadERC20Token = useCallback(async () => {
-    if (!tokenContract) {
+    if (!votesTokenAddress || !publicClient) {
       return;
     }
+
+    const tokenContract = getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
 
     const [tokenName, tokenSymbol, tokenDecimals, totalSupply] = await Promise.all([
       tokenContract.read.name(),
@@ -61,7 +67,7 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
     };
     isTokenLoaded.current = true;
     action.dispatch({ type: FractalGovernanceAction.SET_TOKEN_DATA, payload: tokenData });
-  }, [tokenContract, action]);
+  }, [action, publicClient, votesTokenAddress]);
 
   const loadUnderlyingERC20Token = useCallback(async () => {
     if (!underlyingTokenContract) {
@@ -84,10 +90,16 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
   }, [underlyingTokenContract, action]);
 
   const loadERC20TokenAccountData = useCallback(async () => {
-    if (!account || !tokenContract) {
+    if (!account || !votesTokenAddress || !publicClient) {
       action.dispatch({ type: FractalGovernanceAction.RESET_TOKEN_ACCOUNT_DATA });
       return;
     }
+
+    const tokenContract = getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
 
     const [tokenBalance, tokenDelegatee, tokenVotingWeight] = await Promise.all([
       tokenContract.read.balanceOf([account]),
@@ -105,7 +117,7 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
       type: FractalGovernanceAction.SET_TOKEN_ACCOUNT_DATA,
       payload: tokenAccountData,
     });
-  }, [account, tokenContract, action]);
+  }, [account, action, publicClient, votesTokenAddress]);
 
   useEffect(() => {
     if (
@@ -120,9 +132,19 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
   }, [account, votesTokenAddress, onMount, loadERC20TokenAccountData]);
 
   useEffect(() => {
-    if (!onMount || !tokenContract || !account) {
+    if (!onMount || !account) {
       return;
     }
+
+    if (!votesTokenAddress || !publicClient) {
+      return;
+    }
+
+    const tokenContract = getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
 
     const unwatch = tokenContract.watchEvent.DelegateVotesChanged(
       { delegate: account },
@@ -132,12 +154,22 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
     return () => {
       unwatch();
     };
-  }, [loadERC20TokenAccountData, onMount, tokenContract, account]);
+  }, [loadERC20TokenAccountData, onMount, account, votesTokenAddress, publicClient]);
 
   useEffect(() => {
-    if (!tokenContract || !onMount || !account) {
+    if (!onMount || !account) {
       return;
     }
+
+    if (!votesTokenAddress || !publicClient) {
+      return;
+    }
+
+    const tokenContract = getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
 
     const unwatchDelegator = tokenContract.watchEvent.DelegateChanged(
       { delegator: account },
@@ -157,12 +189,22 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
       unwatchFromDelegate();
       unwatchToDelegate();
     };
-  }, [account, loadERC20TokenAccountData, onMount, tokenContract]);
+  }, [account, loadERC20TokenAccountData, onMount, publicClient, votesTokenAddress]);
 
   useEffect(() => {
-    if (!onMount || !account || !tokenContract) {
+    if (!onMount || !account) {
       return;
     }
+
+    if (!votesTokenAddress || !publicClient) {
+      return;
+    }
+
+    const tokenContract = getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
 
     const unwatchTo = tokenContract.watchEvent.Transfer(
       { from: account },
@@ -177,7 +219,7 @@ export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) =
       unwatchTo();
       unwatchFrom();
     };
-  }, [account, loadERC20TokenAccountData, onMount, tokenContract]);
+  }, [account, loadERC20TokenAccountData, onMount, publicClient, votesTokenAddress]);
 
   return { loadERC20Token, loadUnderlyingERC20Token, loadERC20TokenAccountData };
 };

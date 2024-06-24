@@ -30,7 +30,7 @@ export function useERC20Claim() {
 
     // TODO here be dark programming...
 
-    const approvals = await votesTokenContract.getEvents.Approval();
+    const approvals = await votesTokenContract.getEvents.Approval(undefined, { fromBlock: 0n });
 
     if (approvals.length === 0 || !approvals[0].args.spender) {
       return;
@@ -43,7 +43,7 @@ export function useERC20Claim() {
     });
 
     const tokenClaimArray = await possibleTokenClaimContract.getEvents
-      .ERC20ClaimCreated()
+      .ERC20ClaimCreated({ fromBlock: 0n })
       .catch(() => []);
 
     const childToken = tokenClaimArray[0].args.childToken;

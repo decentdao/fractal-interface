@@ -61,7 +61,9 @@ export function useCanUserCreateProposal() {
               address: linearVotingErc20Address,
               client: publicClient,
             });
-            return ozLinearVotingContract.read.isProposer([user.address]);
+
+            const isProposer = await ozLinearVotingContract.read.isProposer([user.address]);
+            return isProposer;
           }
         } else if (type === GovernanceType.AZORIUS_ERC721 && linearVotingErc721Address) {
           const erc721LinearVotingContract = getContract({
@@ -69,7 +71,9 @@ export function useCanUserCreateProposal() {
             address: linearVotingErc721Address,
             client: publicClient,
           });
-          return erc721LinearVotingContract.read.isProposer([user.address]);
+
+          const isProposer = await erc721LinearVotingContract.read.isProposer([user.address]);
+          return isProposer;
         } else {
           return;
         }
@@ -87,11 +91,11 @@ export function useCanUserCreateProposal() {
       user.address,
     ],
   );
+
   useEffect(() => {
-    const loadCanUserCreateProposal = async () => {
+    (async () => {
       setCanUserCreateProposal(await getCanUserCreateProposal());
-    };
-    loadCanUserCreateProposal();
+    })();
   }, [getCanUserCreateProposal, canUserCreateProposal]);
 
   return { canUserCreateProposal, getCanUserCreateProposal };

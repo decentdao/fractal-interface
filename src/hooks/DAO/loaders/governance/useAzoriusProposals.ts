@@ -91,7 +91,7 @@ export const useAzoriusProposals = () => {
       return;
     }
 
-    const events = await erc20StrategyContract.getEvents.Voted();
+    const events = await erc20StrategyContract.getEvents.Voted({ fromBlock: 0n });
     return events;
   }, [erc20StrategyContract]);
 
@@ -100,7 +100,7 @@ export const useAzoriusProposals = () => {
       return;
     }
 
-    const events = await erc721StrategyContract.getEvents.Voted();
+    const events = await erc721StrategyContract.getEvents.Voted({ fromBlock: 0n });
     return events;
   }, [erc721StrategyContract]);
 
@@ -109,7 +109,7 @@ export const useAzoriusProposals = () => {
       return;
     }
 
-    const events = await azoriusContract.getEvents.ProposalExecuted();
+    const events = await azoriusContract.getEvents.ProposalExecuted({ fromBlock: 0n });
     return events;
   }, [azoriusContract]);
 
@@ -153,7 +153,9 @@ export const useAzoriusProposals = () => {
       if (!_strategyType || !_azoriusContract || !_publicClient) {
         return;
       }
-      const proposalCreatedEvents = (await _azoriusContract.getEvents.ProposalCreated()).reverse();
+      const proposalCreatedEvents = (
+        await _azoriusContract.getEvents.ProposalCreated({ fromBlock: 0n })
+      ).reverse();
 
       action.dispatch({
         type: FractalGovernanceAction.SET_ALL_PROPOSALS_LOADED,

@@ -71,7 +71,7 @@ export function useMasterCopy() {
       });
 
       return moduleProxyFactoryContract.getEvents
-        .ModuleProxyCreation({ proxy: proxyAddress })
+        .ModuleProxyCreation({ proxy: proxyAddress }, { fromBlock: 0n })
         .then(proxiesCreated => {
           // @dev to prevent redundant queries, cache the master copy address as AddressZero if no proxies were created
           if (proxiesCreated.length === 0) {
