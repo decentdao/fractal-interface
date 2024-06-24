@@ -4,6 +4,7 @@ import { SafeBalanceResponse } from '@safe-global/safe-service-client';
 import { Field, FieldAttributes, FieldProps, Form, Formik } from 'formik';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getAddress } from 'viem';
 import * as Yup from 'yup';
 import useSubmitProposal from '../../../hooks/DAO/proposal/useSubmitProposal';
 import { useValidationAddress } from '../../../hooks/schemas/common/useValidationAddress';
@@ -44,7 +45,7 @@ export function SendAssetsModal({ close }: { close: () => void }) {
     await sendAssets({
       transferAmount: inputAmount?.bigintValue || 0n,
       asset: selectedAsset,
-      destinationAddress,
+      destinationAddress: getAddress(destinationAddress),
       nonce: nonceInput,
       submitProposal,
       t,

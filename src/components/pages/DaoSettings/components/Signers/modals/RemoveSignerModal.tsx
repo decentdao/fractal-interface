@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Address } from 'viem';
 import { useEnsName } from 'wagmi';
+import { SENTINEL_ADDRESS } from '../../../../../../constants/common';
 import { useFractal } from '../../../../../../providers/App/AppProvider';
 import { useNetworkConfig } from '../../../../../../providers/NetworkConfig/NetworkConfigProvider';
 import SupportTooltip from '../../../../../ui/badges/SupportTooltip';
@@ -18,20 +19,20 @@ function RemoveSignerModal({
   currentThreshold,
 }: {
   close: () => void;
-  selectedSigner: string;
-  signers: string[];
+  selectedSigner: Address;
+  signers: Address[];
   currentThreshold: number;
 }) {
   const {
     node: { daoAddress, safe },
   } = useFractal();
   const [thresholdOptions, setThresholdOptions] = useState<number[]>();
-  const [prevSigner, setPrevSigner] = useState<string>('');
+  const [prevSigner, setPrevSigner] = useState<Address>();
   const [threshold, setThreshold] = useState<number>(currentThreshold);
   const [nonce, setNonce] = useState<number | undefined>(safe!.nextNonce);
   const { chain } = useNetworkConfig();
   const { data: ensName } = useEnsName({
-    address: selectedSigner as Address,
+    address: selectedSigner,
     chainId: chain.id,
   });
   const { t } = useTranslation(['modals', 'common']);
@@ -56,9 +57,7 @@ function RemoveSignerModal({
 
   useEffect(() => {
     const signerIndex = signers.findIndex(signer => signer === selectedSigner);
-    setPrevSigner(
-      signerIndex > 0 ? signers[signerIndex - 1] : '0x0000000000000000000000000000000000000001',
-    );
+    setPrevSigner(signerIndex > 0 ? signers[signerIndex - 1] : SENTINEL_ADDRESS);
   }, [selectedSigner, signers]);
 
   return (

@@ -1,15 +1,14 @@
-import { MultisigFreezeGuard } from '@fractal-framework/fractal-contracts';
+import { abis } from '@fractal-framework/fractal-contracts';
 import { SafeMultisigTransactionWithTransfersResponse } from '@safe-global/safe-service-client';
-import { keccak256, encodePacked, isHex } from 'viem';
+import { keccak256, encodePacked, isHex, Address, getContract, PublicClient } from 'viem';
 import { buildSignatureBytes } from '../helpers/crypto';
 import { Activity } from '../types';
-import { Providers } from '../types/network';
 import { getTimeStamp } from './contract';
 
 export async function getTxTimelockedTimestamp(
   activity: Activity,
-  freezeGuard: MultisigFreezeGuard,
-  provider: Providers,
+  freezeGuardAddress: Address,
+  publicClient: PublicClient,
 ) {
   const multiSigTransaction = activity.transaction as SafeMultisigTransactionWithTransfersResponse;
 
@@ -31,9 +30,15 @@ export async function getTxTimelockedTimestamp(
   );
   const signaturesHash = keccak256(encodePacked(['bytes'], [signatures]));
 
+  const freezeGuard = getContract({
+    address: freezeGuardAddress,
+    abi: abis.MultisigFreezeGuard,
+    client: publicClient,
+  });
+
   const timelockedTimestamp = await getTimeStamp(
-    await freezeGuard.getTransactionTimelockedBlock(signaturesHash),
-    provider,
+    await freezeGuard.read.getTransactionTimelockedBlock([signaturesHash]),
+    publicClient,
   );
   return timelockedTimestamp;
 }

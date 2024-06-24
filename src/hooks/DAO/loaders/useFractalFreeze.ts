@@ -1,23 +1,16 @@
-import {
-  ERC20FreezeVoting,
-  ERC721FreezeVoting,
-  MultisigFreezeVoting,
-} from '@fractal-framework/fractal-contracts';
-import { TypedListener } from '@fractal-framework/fractal-contracts/dist/typechain-types/common';
-import { FreezeVoteCastEvent } from '@fractal-framework/fractal-contracts/dist/typechain-types/contracts/ERC20FreezeVoting';
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useCallback, useEffect, useRef } from 'react';
-import { zeroAddress } from 'viem';
-import { useAccount } from 'wagmi';
+import { Address, GetContractReturnType, PublicClient, getContract, zeroAddress } from 'viem';
+import { useAccount, usePublicClient } from 'wagmi';
+import GnosisSafeL2Abi from '../../../assets/abi/GnosisSafeL2';
 import {
   isWithinFreezeProposalPeriod,
   isWithinFreezePeriod,
 } from '../../../helpers/freezePeriodHelpers';
 import { useFractal } from '../../../providers/App/AppProvider';
 import { FractalGuardAction } from '../../../providers/App/guard/action';
-import { useEthersProvider } from '../../../providers/Ethers/hooks/useEthersProvider';
 import { FractalGuardContracts, FreezeVotingType } from '../../../types';
 import { blocksToSeconds, getTimeStamp } from '../../../utils/contract';
-import useSafeContracts from '../../safe/useSafeContracts';
 import useUserERC721VotingTokens from '../proposal/useUserERC721VotingTokens';
 import { FreezeGuard } from './../../../types/fractal';
 
@@ -26,14 +19,13 @@ export const useFractalFreeze = ({
   parentSafeAddress,
 }: {
   loadOnMount?: boolean;
-  parentSafeAddress: string | null;
+  parentSafeAddress: Address | null;
 }) => {
   // load key for component; helps prevent unnecessary calls
   const loadKey = useRef<string>();
   const isFreezeSet = useRef(false);
 
   const { guardContracts, action } = useFractal();
-  const baseContracts = useSafeContracts();
   const { address: account } = useAccount();
   const { getUserERC721VotingTokens } = useUserERC721VotingTokens(
     parentSafeAddress,
@@ -41,49 +33,80 @@ export const useFractalFreeze = ({
     loadOnMount,
   );
 
-  const provider = useEthersProvider();
+  const publicClient = usePublicClient();
 
   const loadFractalFreezeGuard = useCallback(
     async ({
       freezeVotingContractAddress,
       freezeVotingType: freezeVotingType,
     }: FractalGuardContracts) => {
-      if (
-        freezeVotingType == null ||
-        !freezeVotingContractAddress ||
-        !account ||
-        !provider ||
-        !baseContracts
-      ) {
+      if (freezeVotingType == null || !freezeVotingContractAddress || !account || !publicClient) {
         return;
       }
 
-      // @dev using freeze 'multisig' contract but these functions are the same for all freeze types
-      const freezeVotingContract =
-        baseContracts.freezeMultisigVotingMasterCopyContract.asProvider.attach(
-          freezeVotingContractAddress,
-        );
+      let freezeVotingContract:
+        | GetContractReturnType<typeof abis.MultisigFreezeVoting, PublicClient>
+        | GetContractReturnType<typeof abis.ERC20FreezeVoting, PublicClient>
+        | GetContractReturnType<typeof abis.ERC721FreezeVoting, PublicClient>;
+
+      if (freezeVotingType === FreezeVotingType.ERC20) {
+        freezeVotingContract = getContract({
+          abi: abis.ERC20FreezeVoting,
+          address: freezeVotingContractAddress,
+          client: publicClient,
+        });
+      } else if (freezeVotingType === FreezeVotingType.ERC721) {
+        freezeVotingContract = getContract({
+          abi: abis.ERC721FreezeVoting,
+          address: freezeVotingContractAddress,
+          client: publicClient,
+        });
+      } else if (freezeVotingType === FreezeVotingType.MULTISIG) {
+        freezeVotingContract = getContract({
+          abi: abis.MultisigFreezeVoting,
+          address: freezeVotingContractAddress,
+          client: publicClient,
+        });
+      } else {
+        throw new Error('unknown freezeVotingType');
+      }
+
       let userHasVotes: boolean = false;
-      const freezeCreatedBlock = await freezeVotingContract.freezeProposalCreatedBlock();
 
-      const freezeVotesThreshold = (await freezeVotingContract.freezeVotesThreshold()).toBigInt();
-      const freezeProposalCreatedBlock = await freezeVotingContract.freezeProposalCreatedBlock();
-      const freezeProposalCreatedTime = await getTimeStamp(freezeProposalCreatedBlock, provider);
-      const freezeProposalVoteCount = (
-        await freezeVotingContract.freezeProposalVoteCount()
-      ).toBigInt();
-      const freezeProposalBlock = await freezeVotingContract.freezeProposalPeriod();
-      // length of time to vote on freeze
-      const freezeProposalPeriod = await blocksToSeconds(freezeProposalBlock, provider);
-      const freezePeriodBlock = await freezeVotingContract.freezePeriod();
-      // length of time frozen for in seconds
-      const freezePeriod = await blocksToSeconds(freezePeriodBlock, provider);
-
-      const userHasFreezeVoted = await freezeVotingContract.userHasFreezeVoted(
-        account || zeroAddress,
+      const [
         freezeCreatedBlock,
+        freezeVotesThreshold,
+        freezeProposalCreatedBlock,
+        freezeProposalVoteCount,
+        freezeProposalBlock,
+        freezePeriodBlock,
+        isFrozen,
+      ] = await Promise.all([
+        freezeVotingContract.read.freezeProposalCreatedBlock(),
+        freezeVotingContract.read.freezeVotesThreshold(),
+        freezeVotingContract.read.freezeProposalCreatedBlock(),
+        freezeVotingContract.read.freezeProposalVoteCount(),
+        freezeVotingContract.read.freezeProposalPeriod(),
+        freezeVotingContract.read.freezePeriod(),
+        freezeVotingContract.read.isFrozen(),
+      ]);
+
+      // timestamp when proposal was created
+      const freezeProposalCreatedTime = await getTimeStamp(
+        freezeProposalCreatedBlock,
+        publicClient,
       );
-      const isFrozen = await freezeVotingContract.isFrozen();
+
+      // length of time to vote on freeze
+      const freezeProposalPeriod = await blocksToSeconds(freezeProposalBlock, publicClient);
+
+      // length of time frozen for in seconds
+      const freezePeriod = await blocksToSeconds(freezePeriodBlock, publicClient);
+
+      const userHasFreezeVoted = await freezeVotingContract.read.userHasFreezeVoted([
+        account || zeroAddress,
+        BigInt(freezeCreatedBlock),
+      ]);
 
       const freezeGuard = {
         freezeVotesThreshold,
@@ -95,26 +118,32 @@ export const useFractalFreeze = ({
         isFrozen,
       };
 
-      const {
-        votesTokenMasterCopyContract,
-        safeSingletonContract,
-        freezeERC20VotingMasterCopyContract,
-      } = baseContracts;
-
       if (freezeVotingType === FreezeVotingType.MULTISIG) {
-        const safeContract = safeSingletonContract!.asProvider.attach(
-          await (freezeVotingContract as MultisigFreezeVoting).parentGnosisSafe(),
-        );
-        const owners = await safeContract.getOwners();
+        const safeFreezeVotingContract = getContract({
+          abi: abis.MultisigFreezeVoting,
+          address: freezeVotingContractAddress,
+          client: publicClient,
+        });
+
+        const safeContract = getContract({
+          abi: GnosisSafeL2Abi,
+          address: await safeFreezeVotingContract.read.parentGnosisSafe(),
+          client: publicClient,
+        });
+        const owners = await safeContract.read.getOwners();
         userHasVotes = owners.find(owner => owner === account) !== undefined;
       } else if (freezeVotingType === FreezeVotingType.ERC20) {
-        const freezeERC20VotingContract = freezeERC20VotingMasterCopyContract.asProvider.attach(
-          freezeVotingContractAddress,
-        );
-        const votesTokenContract = votesTokenMasterCopyContract!.asProvider.attach(
-          await freezeERC20VotingContract.votesERC20(),
-        );
-        const currentTimestamp = await getTimeStamp('latest', provider);
+        const freezeERC20VotingContract = getContract({
+          abi: abis.ERC20FreezeVoting,
+          address: freezeVotingContractAddress,
+          client: publicClient,
+        });
+        const votesTokenContract = getContract({
+          abi: abis.VotesERC20,
+          address: await freezeERC20VotingContract.read.votesERC20(),
+          client: publicClient,
+        });
+        const currentTimestamp = await getTimeStamp('latest', publicClient);
         const isFreezeActive =
           isWithinFreezeProposalPeriod(
             freezeGuard.freezeProposalCreatedTime,
@@ -129,11 +158,12 @@ export const useFractalFreeze = ({
         userHasVotes =
           (!isFreezeActive
             ? // freeze not active
-              (await votesTokenContract.getVotes(account || '')).toBigInt()
+              await votesTokenContract.read.getVotes([account || ''])
             : // freeze is active
-              (
-                await votesTokenContract.getPastVotes(account || '', freezeCreatedBlock)
-              ).toBigInt()) > 0n;
+              await votesTokenContract.read.getPastVotes([
+                account || '',
+                BigInt(freezeCreatedBlock),
+              ])) > 0n;
       } else if (freezeVotingType === FreezeVotingType.ERC721) {
         const { totalVotingTokenAddresses } = await getUserERC721VotingTokens(
           parentSafeAddress,
@@ -149,7 +179,7 @@ export const useFractalFreeze = ({
       isFreezeSet.current = true;
       return freeze;
     },
-    [account, provider, baseContracts, getUserERC721VotingTokens, parentSafeAddress],
+    [account, publicClient, getUserERC721VotingTokens, parentSafeAddress],
   );
 
   const setFractalFreezeGuard = useCallback(
@@ -179,52 +209,153 @@ export const useFractalFreeze = ({
 
   useEffect(() => {
     const { freezeVotingContractAddress, freezeVotingType: freezeVotingType } = guardContracts;
-    if (!loadOnMount || !provider || !baseContracts || !freezeVotingContractAddress) return;
-    const {
-      freezeERC721VotingMasterCopyContract,
-      freezeMultisigVotingMasterCopyContract,
-      freezeERC20VotingMasterCopyContract,
-    } = baseContracts;
 
-    // @dev using freeze 'multisig' contract but these functions are the same for all freeze types
-    let votingRPC: MultisigFreezeVoting | ERC20FreezeVoting | ERC721FreezeVoting =
-      freezeMultisigVotingMasterCopyContract.asProvider.attach(freezeVotingContractAddress);
-
-    const listenerCallback: TypedListener<FreezeVoteCastEvent> = async (
-      voter: string,
-      votesCast,
-    ) => {
-      const freezeProposalCreatedBlock = await votingRPC.freezeProposalCreatedBlock();
-      action.dispatch({
-        type: FractalGuardAction.UPDATE_FREEZE_VOTE,
-        payload: {
-          isVoter: voter === account,
-          freezeProposalCreatedTime: BigInt(
-            await getTimeStamp(freezeProposalCreatedBlock, provider),
-          ),
-          votesCast: votesCast.toBigInt(),
-        },
-      });
-    };
-
-    if (isFreezeSet.current && freezeVotingType !== null && freezeVotingContractAddress) {
-      if (freezeVotingType === FreezeVotingType.MULTISIG) {
-        const filter = votingRPC.filters.FreezeVoteCast();
-        votingRPC.on(filter, listenerCallback);
-      } else if (freezeVotingType === FreezeVotingType.ERC20) {
-        votingRPC = freezeERC20VotingMasterCopyContract.asProvider.attach(
-          freezeVotingContractAddress,
-        );
-        const filter = votingRPC.filters.FreezeVoteCast();
-        votingRPC.on(filter, listenerCallback);
-      } else if (freezeVotingType === FreezeVotingType.ERC721) {
-        votingRPC = freezeERC721VotingMasterCopyContract.asProvider.attach(
-          freezeVotingContractAddress,
-        );
-        const filter = votingRPC.filters.FreezeVoteCast();
-        votingRPC.on(filter, listenerCallback);
-      }
+    if (
+      !loadOnMount ||
+      !freezeVotingContractAddress ||
+      !publicClient ||
+      !isFreezeSet.current ||
+      freezeVotingType !== FreezeVotingType.MULTISIG
+    ) {
+      return;
     }
-  }, [guardContracts, account, action, loadOnMount, provider, baseContracts]);
+
+    const freezeVotingContract = getContract({
+      abi: abis.MultisigFreezeVoting,
+      address: freezeVotingContractAddress,
+      client: publicClient,
+    });
+
+    const unwatch = freezeVotingContract.watchEvent.FreezeVoteCast(
+      { voter: null },
+      {
+        onLogs: async logs => {
+          for (const log of logs) {
+            if (!log.args.voter || !log.args.votesCast) {
+              continue;
+            }
+
+            const freezeProposalCreatedBlock =
+              await freezeVotingContract.read.freezeProposalCreatedBlock();
+            action.dispatch({
+              type: FractalGuardAction.UPDATE_FREEZE_VOTE,
+              payload: {
+                isVoter: log.args.voter === account,
+                freezeProposalCreatedTime: BigInt(
+                  await getTimeStamp(freezeProposalCreatedBlock, publicClient),
+                ),
+                votesCast: log.args.votesCast,
+              },
+            });
+          }
+        },
+      },
+    );
+
+    return () => {
+      unwatch();
+    };
+  }, [account, action, guardContracts, loadOnMount, publicClient]);
+
+  useEffect(() => {
+    const { freezeVotingContractAddress, freezeVotingType: freezeVotingType } = guardContracts;
+
+    if (
+      !loadOnMount ||
+      !freezeVotingContractAddress ||
+      !publicClient ||
+      !isFreezeSet.current ||
+      freezeVotingType !== FreezeVotingType.ERC721
+    ) {
+      return;
+    }
+
+    const freezeVotingContract = getContract({
+      abi: abis.ERC721FreezeVoting,
+      address: freezeVotingContractAddress,
+      client: publicClient,
+    });
+
+    const unwatch = freezeVotingContract.watchEvent.FreezeVoteCast(
+      { voter: null },
+      {
+        onLogs: async logs => {
+          for (const log of logs) {
+            if (!log.args.voter || !log.args.votesCast) {
+              continue;
+            }
+
+            const freezeProposalCreatedBlock =
+              await freezeVotingContract.read.freezeProposalCreatedBlock();
+            action.dispatch({
+              type: FractalGuardAction.UPDATE_FREEZE_VOTE,
+              payload: {
+                isVoter: log.args.voter === account,
+                freezeProposalCreatedTime: BigInt(
+                  await getTimeStamp(freezeProposalCreatedBlock, publicClient),
+                ),
+                votesCast: log.args.votesCast,
+              },
+            });
+          }
+        },
+      },
+    );
+
+    return () => {
+      unwatch();
+    };
+  }, [account, action, guardContracts, loadOnMount, publicClient]);
+
+  useEffect(() => {
+    const { freezeVotingContractAddress, freezeVotingType: freezeVotingType } = guardContracts;
+
+    if (
+      !loadOnMount ||
+      !freezeVotingContractAddress ||
+      !publicClient ||
+      !isFreezeSet.current ||
+      freezeVotingType !== FreezeVotingType.ERC20
+    ) {
+      return;
+    }
+
+    const freezeVotingContract = getContract({
+      abi: abis.ERC20FreezeVoting,
+      address: freezeVotingContractAddress,
+      client: publicClient,
+    });
+
+    const unwatch = freezeVotingContract.watchEvent.FreezeVoteCast(
+      { voter: null },
+      {
+        onLogs: async logs => {
+          for (const log of logs) {
+            if (!log.args.voter || !log.args.votesCast) {
+              continue;
+            }
+
+            const freezeProposalCreatedBlock =
+              await freezeVotingContract.read.freezeProposalCreatedBlock();
+            action.dispatch({
+              type: FractalGuardAction.UPDATE_FREEZE_VOTE,
+              payload: {
+                isVoter: log.args.voter === account,
+                freezeProposalCreatedTime: BigInt(
+                  await getTimeStamp(freezeProposalCreatedBlock, publicClient),
+                ),
+                votesCast: log.args.votesCast,
+              },
+            });
+          }
+        },
+      },
+    );
+
+    return () => {
+      unwatch();
+    };
+  }, [account, action, guardContracts, loadOnMount, publicClient]);
+
   return loadFractalFreezeGuard;
 };

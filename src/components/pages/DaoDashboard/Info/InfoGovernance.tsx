@@ -1,11 +1,12 @@
 import { Box, Flex, Text } from '@chakra-ui/react';
+import { abis } from '@fractal-framework/fractal-contracts';
 import { Bank } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import useSafeContracts from '../../../../hooks/safe/useSafeContracts';
+import { getContract } from 'viem';
+import { usePublicClient } from 'wagmi';
 import { useTimeHelpers } from '../../../../hooks/utils/useTimeHelpers';
 import { useFractal } from '../../../../providers/App/AppProvider';
-import { useEthersProvider } from '../../../../providers/Ethers/hooks/useEthersProvider';
 import { AzoriusGovernance, FreezeGuardType } from '../../../../types';
 import { blocksToSeconds } from '../../../../utils/contract';
 import { BarLoader } from '../../../ui/loaders/BarLoader';
@@ -18,26 +19,34 @@ export function InfoGovernance() {
     guardContracts: { freezeGuardType, freezeGuardContractAddress },
     readOnly: { dao },
   } = useFractal();
-  const provider = useEthersProvider();
+  const publicClient = usePublicClient();
   const { getTimeDuration } = useTimeHelpers();
-  const baseContracts = useSafeContracts();
   const [timelockPeriod, setTimelockPeriod] = useState<string>();
   const [executionPeriod, setExecutionPeriod] = useState<string>();
   useEffect(() => {
     const setTimelockInfo = async () => {
       const formatBlocks = async (blocks: number): Promise<string | undefined> => {
-        if (provider) {
-          return getTimeDuration(await blocksToSeconds(blocks, provider));
+        if (publicClient) {
+          return getTimeDuration(await blocksToSeconds(blocks, publicClient));
         }
       };
       if (freezeGuardType == FreezeGuardType.MULTISIG) {
-        if (freezeGuardContractAddress && baseContracts) {
-          const freezeGuardContract =
-            baseContracts.multisigFreezeGuardMasterCopyContract.asProvider.attach(
-              freezeGuardContractAddress,
-            );
-          setTimelockPeriod(await formatBlocks(await freezeGuardContract.timelockPeriod()));
-          setExecutionPeriod(await formatBlocks(await freezeGuardContract.executionPeriod()));
+        if (freezeGuardContractAddress && publicClient) {
+          const freezeGuardContract = getContract({
+            abi: abis.MultisigFreezeGuard,
+            address: freezeGuardContractAddress,
+            client: publicClient,
+          });
+          const [contractTimelockPeriod, contractExecutionPeriod] = await Promise.all([
+            freezeGuardContract.read.timelockPeriod(),
+            freezeGuardContract.read.executionPeriod(),
+          ]);
+          const [timelockSeconds, executionPeriodSeconds] = await Promise.all([
+            formatBlocks(contractTimelockPeriod),
+            formatBlocks(contractExecutionPeriod),
+          ]);
+          setTimelockPeriod(timelockSeconds);
+          setExecutionPeriod(executionPeriodSeconds);
         }
       } else if (dao?.isAzorius) {
         const azoriusGovernance = governance as AzoriusGovernance;
@@ -58,15 +67,14 @@ export function InfoGovernance() {
 
     setTimelockInfo();
   }, [
-    baseContracts,
     executionPeriod,
     getTimeDuration,
     governance,
     freezeGuardContractAddress,
     freezeGuardType,
-    provider,
     timelockPeriod,
     dao,
+    publicClient,
   ]);
 
   if (!daoAddress || !governance.type) {

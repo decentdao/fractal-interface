@@ -1,6 +1,5 @@
 import { ReactNode, useReducer, useMemo, Context, createContext, useContext } from 'react';
 import { useAccount } from 'wagmi';
-import useSafeContracts from '../../hooks/safe/useSafeContracts';
 import { FractalStore, StoreAction } from '../../types';
 import { combinedReducer, initialState } from './combinedReducer';
 import { useReadOnlyValues } from './useReadOnlyValues';
@@ -11,8 +10,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { address: account } = useAccount();
   // Replace individual useReducer calls with a single combined reducer
   const [state, dispatch] = useReducer(combinedReducer, initialState);
-  // loads base Fractal contracts with provider into state
-  const baseContracts = useSafeContracts();
   // memoize fractal store
   const { readOnlyValues, loadReadOnlyValues } = useReadOnlyValues(state, account);
   const fractalStore: FractalStore = useMemo(() => {
@@ -31,9 +28,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await Promise.resolve(dispatch({ type: StoreAction.RESET }));
         },
       },
-      baseContracts,
     };
-  }, [state, baseContracts, loadReadOnlyValues, readOnlyValues]);
+  }, [state, loadReadOnlyValues, readOnlyValues]);
 
   return <FractalContext.Provider value={fractalStore}>{children}</FractalContext.Provider>;
 }

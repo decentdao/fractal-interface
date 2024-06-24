@@ -1,39 +1,34 @@
 import { useCallback } from 'react';
 import { getAddress } from 'viem';
-import { useFractal } from '../../../providers/App/AppProvider';
+import { usePublicClient } from 'wagmi';
 import { FractalModuleData, FractalModuleType } from '../../../types';
 import { useMasterCopy } from '../../utils/useMasterCopy';
 
 export const useFractalModules = () => {
-  const { baseContracts } = useFractal();
   const { getZodiacModuleProxyMasterCopyData } = useMasterCopy();
+  const publicClient = usePublicClient();
   const lookupModules = useCallback(
     async (_moduleAddresses: string[]) => {
       const modules = await Promise.all(
-        _moduleAddresses.map(async moduleAddress => {
-          const masterCopyData = await getZodiacModuleProxyMasterCopyData(
-            getAddress(moduleAddress),
-          );
+        _moduleAddresses.map(async moduleAddressString => {
+          const moduleAddress = getAddress(moduleAddressString);
+
+          const masterCopyData = await getZodiacModuleProxyMasterCopyData(moduleAddress);
 
           let safeModule: FractalModuleData;
 
-          if (masterCopyData.isAzorius && baseContracts) {
+          if (masterCopyData.isModuleAzorius && publicClient) {
             safeModule = {
-              moduleContract:
-                baseContracts.fractalAzoriusMasterCopyContract.asSigner.attach(moduleAddress),
               moduleAddress: moduleAddress,
               moduleType: FractalModuleType.AZORIUS,
             };
-          } else if (masterCopyData.isFractalModule && baseContracts) {
+          } else if (masterCopyData.isModuleFractal && publicClient) {
             safeModule = {
-              moduleContract:
-                baseContracts.fractalModuleMasterCopyContract.asSigner.attach(moduleAddress),
               moduleAddress: moduleAddress,
               moduleType: FractalModuleType.FRACTAL,
             };
           } else {
             safeModule = {
-              moduleContract: undefined,
               moduleAddress: moduleAddress,
               moduleType: FractalModuleType.UNKNOWN,
             };
@@ -44,7 +39,7 @@ export const useFractalModules = () => {
       );
       return modules;
     },
-    [baseContracts, getZodiacModuleProxyMasterCopyData],
+    [getZodiacModuleProxyMasterCopyData, publicClient],
   );
   return lookupModules;
 };

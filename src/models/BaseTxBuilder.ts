@@ -1,33 +1,23 @@
-import { ethers } from 'ethers';
-import {
-  BaseContracts,
-  AzoriusContracts,
-  SafeMultisigDAO,
-  SubDAO,
-  AzoriusERC20DAO,
-  AzoriusERC721DAO,
-} from '../types';
+import { Address, PublicClient } from 'viem';
+import { SafeMultisigDAO, SubDAO, AzoriusERC20DAO, AzoriusERC721DAO } from '../types';
 
 export class BaseTxBuilder {
-  protected readonly signerOrProvider: ethers.Signer | any;
-  protected readonly baseContracts: BaseContracts;
-  protected readonly azoriusContracts: AzoriusContracts | undefined;
+  protected readonly publicClient: PublicClient;
+  protected readonly isAzorius: boolean;
   protected readonly daoData: SafeMultisigDAO | AzoriusERC20DAO | AzoriusERC721DAO | SubDAO;
-  protected readonly parentAddress?: string;
-  protected readonly parentTokenAddress?: string;
+  protected readonly parentAddress?: Address;
+  protected readonly parentTokenAddress?: Address;
 
   constructor(
-    signerOrProvider: ethers.Signer | any,
-    baseContracts: BaseContracts,
-    azoriusContracts: AzoriusContracts | undefined,
+    publicClient: PublicClient,
+    isAzorius: boolean,
     daoData: SafeMultisigDAO | AzoriusERC20DAO | AzoriusERC721DAO | SubDAO,
-    parentAddress?: string,
-    parentTokenAddress?: string,
+    parentAddress?: Address,
+    parentTokenAddress?: Address,
   ) {
-    this.signerOrProvider = signerOrProvider;
-    this.baseContracts = baseContracts;
+    this.publicClient = publicClient;
     this.daoData = daoData;
-    this.azoriusContracts = azoriusContracts;
+    this.isAzorius = isAzorius;
     this.parentAddress = parentAddress;
     this.parentTokenAddress = parentTokenAddress;
   }

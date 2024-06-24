@@ -1,5 +1,3 @@
-import { TypedDataSigner } from '@ethersproject/abstract-signer';
-import { Contract, Signer } from 'ethers';
 import {
   hashTypedData,
   Hash,
@@ -7,13 +5,13 @@ import {
   toHex,
   toBytes,
   encodePacked,
-  getAddress,
   Address,
   bytesToBigInt,
   Hex,
-  isHex,
+  encodeFunctionData,
+  Abi,
+  WalletClient,
 } from 'viem';
-import { ContractConnection } from '../types';
 import { MetaTransaction, SafePostTransaction, SafeTransaction } from '../types/transaction';
 
 export interface SafeSignature {
@@ -42,12 +40,12 @@ export function getRandomBytes() {
 }
 
 export const calculateSafeTransactionHash = (
-  safe: Contract,
+  safeAddress: Address,
   safeTx: SafeTransaction,
   chainId: number,
 ): string => {
   return hashTypedData({
-    domain: { verifyingContract: getAddress(safe.address), chainId },
+    domain: { verifyingContract: safeAddress, chainId },
     types: EIP712_SAFE_TX_TYPE,
     primaryType: 'SafeTx',
     message: { ...safeTx },
@@ -73,8 +71,8 @@ export const buildSafeTransaction = (template: {
   safeTxGas?: number | string;
   baseGas?: number | string;
   gasPrice?: number | string;
-  gasToken?: string;
-  refundReceiver?: string;
+  gasToken?: Address;
+  refundReceiver?: Address;
   nonce: number;
 }): SafeTransaction => {
   return {
@@ -92,22 +90,33 @@ export const buildSafeTransaction = (template: {
 };
 
 export const safeSignTypedData = async (
-  signer: Signer & TypedDataSigner,
-  safe: Contract,
+  walletClient: WalletClient,
+  contractAddress: Address,
   safeTx: SafeTransaction,
-  chainId?: number,
+  chainId: number,
 ): Promise<SafeSignature> => {
-  if (!chainId && !signer.provider) throw Error('Provider required to retrieve chainId');
-  const cid = chainId || (await signer.provider!.getNetwork()).chainId;
-  const signerAddress = await signer.getAddress();
-  const signedData = await signer._signTypedData(
-    { verifyingContract: safe.address, chainId: cid },
-    EIP712_SAFE_TX_TYPE,
-    safeTx,
-  );
-  if (!isHex(signedData)) {
-    throw new Error('Error signing message');
-  }
+  if (!walletClient.account) throw new Error("Signer doesn't have account");
+
+  const signerAddress = walletClient.account.address;
+  const signedData = await walletClient.signTypedData({
+    account: signerAddress,
+    domain: { verifyingContract: contractAddress, chainId },
+    types: EIP712_SAFE_TX_TYPE,
+    primaryType: 'SafeTx',
+    message: {
+      to: safeTx.to,
+      value: safeTx.value,
+      data: safeTx.data,
+      operation: safeTx.operation,
+      safeTxGas: safeTx.safeTxGas,
+      baseGas: safeTx.baseGas,
+      gasPrice: safeTx.gasPrice,
+      gasToken: safeTx.gasToken,
+      refundReceiver: safeTx.refundReceiver,
+      nonce: safeTx.nonce,
+    },
+  });
+
   return {
     signer: signerAddress,
     data: signedData,
@@ -115,8 +124,8 @@ export const safeSignTypedData = async (
 };
 
 export const buildSafeAPIPost = async (
-  safeContract: Contract,
-  signerOrProvider: Signer & TypedDataSigner,
+  safeAddress: Address,
+  walletClient: WalletClient,
   chainId: number,
   template: {
     to: Address;
@@ -126,25 +135,19 @@ export const buildSafeAPIPost = async (
     safeTxGas?: number | string;
     baseGas?: number | string;
     gasPrice?: number | string;
-    gasToken?: string;
-    refundReceiver?: string;
+    gasToken?: Address;
+    refundReceiver?: Address;
     nonce: number;
   },
 ): Promise<SafePostTransaction> => {
-  const safeTx = buildSafeTransaction(template);
+  if (!walletClient.account) throw new Error("Signer doesn't have account");
 
-  const txHash = calculateSafeTransactionHash(safeContract, safeTx, chainId);
-  const sig = [
-    await safeSignTypedData(
-      signerOrProvider as Signer & TypedDataSigner,
-      safeContract,
-      safeTx,
-      chainId,
-    ),
-  ];
+  const safeTx = buildSafeTransaction(template);
+  const txHash = calculateSafeTransactionHash(safeAddress, safeTx, chainId);
+  const sig = [await safeSignTypedData(walletClient, safeAddress, safeTx, chainId)];
   const signatureBytes = buildSignatureBytes(sig);
   return {
-    safe: safeContract.address,
+    safe: safeAddress,
     to: safeTx.to,
     value: safeTx.value ? safeTx.value.toString() : '0',
     data: safeTx.data,
@@ -156,25 +159,23 @@ export const buildSafeAPIPost = async (
     refundReceiver: safeTx.refundReceiver,
     nonce: safeTx.nonce,
     contractTransactionHash: txHash,
-    sender: await signerOrProvider.getAddress(),
+    sender: walletClient.account.address,
     signature: signatureBytes,
   };
 };
 
-export const buildContractCall = (
-  contract: Contract,
-  method: string,
-  params: any[],
+const finishBuildingConractCall = (
+  data: Hex,
   nonce: number,
+  contractAddress: Address,
   delegateCall?: boolean,
   overrides?: Partial<SafeTransaction>,
-): SafeTransaction => {
-  const data = contract.interface.encodeFunctionData(method, params);
+) => {
   const operation: 0 | 1 = delegateCall ? 1 : 0;
   return buildSafeTransaction(
     Object.assign(
       {
-        to: contract.address,
+        to: contractAddress,
         data,
         operation,
         nonce,
@@ -182,6 +183,24 @@ export const buildContractCall = (
       overrides,
     ),
   );
+};
+
+export const buildContractCall = (
+  contractAbi: Abi,
+  contractAddress: Address,
+  method: string,
+  params: any[],
+  nonce: number,
+  delegateCall?: boolean,
+  overrides?: Partial<SafeTransaction>,
+): SafeTransaction => {
+  const data = encodeFunctionData({
+    abi: contractAbi,
+    functionName: method,
+    args: params,
+  });
+
+  return finishBuildingConractCall(data, nonce, contractAddress, delegateCall, overrides);
 };
 
 const encodeMetaTransaction = (tx: MetaTransaction): string => {
@@ -194,13 +213,6 @@ const encodeMetaTransaction = (tx: MetaTransaction): string => {
   return encoded.slice(2);
 };
 
-export const encodeMultiSend = (txs: MetaTransaction[]): string => {
-  return '0x' + txs.map(tx => encodeMetaTransaction(tx)).join('');
+export const encodeMultiSend = (txs: MetaTransaction[]): Hex => {
+  return `0x${txs.map(tx => encodeMetaTransaction(tx)).join('')}`;
 };
-
-/**
- * TODO: Remove getEventRPC usage as whole
- */
-export function getEventRPC<T>(connection: ContractConnection<T>): T {
-  return connection.asProvider;
-}

@@ -1,6 +1,7 @@
 import { Box, Grid, GridItem, Text } from '@chakra-ui/react';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import { Address, getAddress } from 'viem';
 import { useFractal } from '../../../providers/App/AppProvider';
 import { MultisigProposal } from '../../../types';
 import { DEFAULT_DATE_TIME_FORMAT } from '../../../utils/numberFormats';
@@ -14,7 +15,7 @@ function OwnerInfoRow({
   proposal,
   isMe,
 }: {
-  owner: string;
+  owner: Address;
   proposal: MultisigProposal;
   isMe: boolean;
 }) {
@@ -81,7 +82,7 @@ export function SignerDetails({ proposal }: { proposal: MultisigProposal }) {
           {safe.owners.map(owner => (
             <OwnerInfoRow
               key={owner}
-              owner={owner}
+              owner={getAddress(owner)}
               proposal={proposal}
               isMe={user.address === owner}
             />

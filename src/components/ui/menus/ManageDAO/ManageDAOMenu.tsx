@@ -1,9 +1,10 @@
 import { Icon, IconButton } from '@chakra-ui/react';
-import { ERC20FreezeVoting, MultisigFreezeVoting } from '@fractal-framework/fractal-contracts';
+import { abis } from '@fractal-framework/fractal-contracts';
 import { GearFine } from '@phosphor-icons/react';
 import { useMemo, useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Address, getAddress } from 'viem';
+import { Address, getContract } from 'viem';
+import { useWalletClient } from 'wagmi';
 import { DAO_ROUTES } from '../../../../constants/routes';
 import {
   isWithinFreezePeriod,
@@ -11,27 +12,24 @@ import {
 } from '../../../../helpers/freezePeriodHelpers';
 import useUserERC721VotingTokens from '../../../../hooks/DAO/proposal/useUserERC721VotingTokens';
 import useClawBack from '../../../../hooks/DAO/useClawBack';
-import useSafeContracts from '../../../../hooks/safe/useSafeContracts';
 import useBlockTimestamp from '../../../../hooks/utils/useBlockTimestamp';
 import { useCanUserCreateProposal } from '../../../../hooks/utils/useCanUserSubmitProposal';
 import { useMasterCopy } from '../../../../hooks/utils/useMasterCopy';
+import useVotingStrategyAddress from '../../../../hooks/utils/useVotingStrategyAddress';
 import { useFractal } from '../../../../providers/App/AppProvider';
 import { useNetworkConfig } from '../../../../providers/NetworkConfig/NetworkConfigProvider';
 import {
   FractalGuardContracts,
-  FractalNode,
   FreezeGuard,
   GovernanceType,
   FreezeVotingType,
 } from '../../../../types';
-import { getAzoriusModuleFromModules } from '../../../../utils';
 import { ModalType } from '../../modals/ModalProvider';
 import { useFractalModal } from '../../modals/useFractalModal';
 import { OptionMenu } from '../OptionMenu';
 
 interface IManageDAOMenu {
   parentAddress: Address | null;
-  fractalNode: FractalNode;
   freezeGuard: FreezeGuard;
   guardContracts: FractalGuardContracts;
 }
@@ -45,64 +43,40 @@ interface IManageDAOMenu {
  *
  * All info for this menu should be supplied in the constructor.
  */
-export function ManageDAOMenu({
-  parentAddress,
-  freezeGuard,
-  guardContracts,
-  fractalNode,
-}: IManageDAOMenu) {
+export function ManageDAOMenu({ parentAddress, freezeGuard, guardContracts }: IManageDAOMenu) {
   const [governanceType, setGovernanceType] = useState(GovernanceType.MULTISIG);
   const {
-    node: { safe },
+    node,
     governance: { type },
   } = useFractal();
-  const baseContracts = useSafeContracts();
   const currentTime = BigInt(useBlockTimestamp());
   const navigate = useNavigate();
-  const safeAddress = fractalNode.daoAddress;
+  const safeAddress = node.daoAddress;
   const { getZodiacModuleProxyMasterCopyData } = useMasterCopy();
   const { canUserCreateProposal } = useCanUserCreateProposal();
   const { getUserERC721VotingTokens } = useUserERC721VotingTokens(safeAddress, undefined, false);
   const { handleClawBack } = useClawBack({
     parentAddress,
-    childSafeInfo: fractalNode,
+    childSafeInfo: node,
   });
+  const { getVotingStrategyAddress } = useVotingStrategyAddress();
 
   useEffect(() => {
     const loadGovernanceType = async () => {
-      if (safe && safe.address && safe.address === safeAddress && type) {
+      if (node.safe && node.safe.address && node.safe.address === safeAddress && type) {
         // Since safe.address (global scope DAO address) and safeAddress(Node provided to this component via props)
         // are the same - we can simply grab governance type from global scope and avoid double-fetching
         setGovernanceType(type);
       } else {
-        if (baseContracts) {
+        if (node?.fractalModules) {
           let result = GovernanceType.MULTISIG;
-          const azoriusModule = getAzoriusModuleFromModules(fractalNode.fractalModules);
-          const { fractalAzoriusMasterCopyContract } = baseContracts;
-          if (!!azoriusModule) {
-            const azoriusContract = {
-              asProvider: fractalAzoriusMasterCopyContract.asProvider.attach(
-                azoriusModule.moduleAddress,
-              ),
-              asSigner: fractalAzoriusMasterCopyContract.asSigner.attach(
-                azoriusModule.moduleAddress,
-              ),
-            };
+          const votingContractAddress = await getVotingStrategyAddress();
+          if (votingContractAddress) {
+            const masterCopyData = await getZodiacModuleProxyMasterCopyData(votingContractAddress);
 
-            // @dev assumes the first strategy is the voting contract
-            const votingContractAddress = (
-              await azoriusContract.asProvider.getStrategies(
-                '0x0000000000000000000000000000000000000001',
-                0,
-              )
-            )[1];
-            const masterCopyData = await getZodiacModuleProxyMasterCopyData(
-              getAddress(votingContractAddress),
-            );
-
-            if (masterCopyData.isOzLinearVoting) {
+            if (masterCopyData.isLinearVotingErc20) {
               result = GovernanceType.AZORIUS_ERC20;
-            } else if (masterCopyData.isOzLinearVotingERC721) {
+            } else if (masterCopyData.isLinearVotingErc721) {
               result = GovernanceType.AZORIUS_ERC721;
             }
           }
@@ -113,7 +87,14 @@ export function ManageDAOMenu({
     };
 
     loadGovernanceType();
-  }, [fractalNode, safe, safeAddress, type, getZodiacModuleProxyMasterCopyData, baseContracts]);
+  }, [
+    getVotingStrategyAddress,
+    getZodiacModuleProxyMasterCopyData,
+    node?.fractalModules,
+    node.safe,
+    safeAddress,
+    type,
+  ]);
   const { addressPrefix } = useNetworkConfig();
 
   const handleNavigateToSettings = useCallback(() => {
@@ -124,39 +105,63 @@ export function ManageDAOMenu({
 
   const handleModifyGovernance = useFractalModal(ModalType.CONFIRM_MODIFY_GOVERNANCE);
 
+  const { data: walletClient } = useWalletClient();
+
   const freezeOption = useMemo(
     () => ({
       optionKey: 'optionInitiateFreeze',
       onClick: () => {
-        const freezeVotingContract =
-          baseContracts!.freezeMultisigVotingMasterCopyContract.asSigner.attach(
-            guardContracts!.freezeVotingContractAddress!,
-          );
         const freezeVotingType = guardContracts!.freezeVotingType;
-        if (freezeVotingContract) {
-          if (
-            freezeVotingType === FreezeVotingType.MULTISIG ||
-            freezeVotingType === FreezeVotingType.ERC20
-          ) {
-            return (
-              freezeVotingContract as ERC20FreezeVoting | MultisigFreezeVoting
-            ).castFreezeVote();
-          } else if (freezeVotingType === FreezeVotingType.ERC721) {
-            getUserERC721VotingTokens(parentAddress, undefined).then(tokensInfo => {
-              const freezeERC721VotingContract =
-                baseContracts!.freezeERC721VotingMasterCopyContract.asSigner.attach(
-                  guardContracts!.freezeVotingContractAddress!,
-                );
-              return freezeERC721VotingContract!['castFreezeVote(address[],uint256[])'](
-                tokensInfo.totalVotingTokenAddresses,
-                tokensInfo.totalVotingTokenIds,
-              );
-            });
+
+        if (freezeVotingType === FreezeVotingType.MULTISIG) {
+          if (!guardContracts.freezeVotingContractAddress) {
+            throw new Error('freeze voting contract address not set');
           }
+          if (!walletClient) {
+            throw new Error('wallet client not set');
+          }
+
+          const freezeVotingContract = getContract({
+            abi: abis.MultisigFreezeVoting,
+            address: guardContracts.freezeVotingContractAddress,
+            client: walletClient,
+          });
+          return freezeVotingContract.write.castFreezeVote();
+        } else if (freezeVotingType === FreezeVotingType.ERC20) {
+          if (!guardContracts.freezeVotingContractAddress) {
+            throw new Error('freeze voting contract address not set');
+          }
+          if (!walletClient) {
+            throw new Error('wallet client not set');
+          }
+          const contract = getContract({
+            abi: abis.ERC20FreezeVoting,
+            address: guardContracts.freezeVotingContractAddress,
+            client: walletClient,
+          });
+          return contract.write.castFreezeVote();
+        } else if (freezeVotingType === FreezeVotingType.ERC721) {
+          getUserERC721VotingTokens(parentAddress, undefined).then(tokensInfo => {
+            if (!guardContracts.freezeVotingContractAddress) {
+              throw new Error('freeze voting contract address not set');
+            }
+            if (!walletClient) {
+              throw new Error('wallet client not set');
+            }
+            const freezeERC721VotingContract = getContract({
+              abi: abis.ERC721FreezeVoting,
+              address: guardContracts.freezeVotingContractAddress,
+              client: walletClient,
+            });
+            return freezeERC721VotingContract.write.castFreezeVote([
+              tokensInfo.totalVotingTokenAddresses,
+              tokensInfo.totalVotingTokenIds.map(i => BigInt(i)),
+            ]);
+          });
         }
       },
     }),
-    [baseContracts, guardContracts, getUserERC721VotingTokens, parentAddress],
+    [getUserERC721VotingTokens, guardContracts, parentAddress, walletClient],
   );
 
   const options = useMemo(() => {

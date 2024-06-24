@@ -1,5 +1,6 @@
 import { Text } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
+import { Address } from 'viem';
 import useDisplayName from '../../hooks/utils/useDisplayName';
 import EtherscanLink from '../ui/links/EtherscanLink';
 
@@ -8,7 +9,7 @@ export function ActivityAddress({
   isMe = false,
   addComma,
 }: {
-  address: string;
+  address: Address;
   isMe?: boolean;
   addComma?: boolean;
 }) {

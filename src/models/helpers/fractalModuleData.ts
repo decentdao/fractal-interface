@@ -1,18 +1,17 @@
+import { abis } from '@fractal-framework/fractal-contracts';
 import {
-  FractalModule,
-  FractalModule__factory,
-  ModuleProxyFactory,
-} from '@fractal-framework/fractal-contracts';
-import { encodeAbiParameters, parseAbiParameters, getAddress, isHex } from 'viem';
-import { GnosisSafeL2 } from '../../assets/typechain-types/usul/@gnosis.pm/safe-contracts/contracts';
+  encodeAbiParameters,
+  parseAbiParameters,
+  Address,
+  getCreate2Address,
+  keccak256,
+  encodePacked,
+  encodeFunctionData,
+} from 'viem';
+import GnosisSafeL2Abi from '../../assets/abi/GnosisSafeL2';
 import { buildContractCall } from '../../helpers/crypto';
 import { SafeTransaction } from '../../types';
-import {
-  buildDeployZodiacModuleTx,
-  generateContractByteCodeLinear,
-  generatePredictedModuleAddress,
-  generateSalt,
-} from './utils';
+import { generateContractByteCodeLinear, generateSalt } from './utils';
 
 export interface FractalModuleData {
   predictedFractalModuleAddress: string;
@@ -21,46 +20,47 @@ export interface FractalModuleData {
 }
 
 export const fractalModuleData = (
-  fractalModuleMasterCopyContract: FractalModule,
-  zodiacModuleProxyFactoryContract: ModuleProxyFactory,
-  safeContract: GnosisSafeL2,
+  fractalModuleMasterCopyAddress: Address,
+  moduleProxyFactoryAddress: Address,
+  safeAddress: Address,
   saltNum: bigint,
-  parentAddress?: string,
+  parentAddress?: Address,
 ): FractalModuleData => {
-  const fractalModuleCalldata = FractalModule__factory.createInterface().encodeFunctionData(
-    'setUp',
-    [
+  const fractalModuleCalldata = encodeFunctionData({
+    abi: abis.FractalModule,
+    functionName: 'setUp',
+    args: [
       encodeAbiParameters(parseAbiParameters(['address, address, address, address[]']), [
-        getAddress(parentAddress ?? safeContract.address), // Owner -- Parent DAO or safe contract
-        getAddress(safeContract.address), // Avatar
-        getAddress(safeContract.address), // Target
+        parentAddress ?? safeAddress, // Owner -- Parent DAO or safe contract
+        safeAddress, // Avatar
+        safeAddress, // Target
         [], // Authorized Controllers
       ]),
     ],
-  );
+  });
 
-  if (!isHex(fractalModuleCalldata)) {
-    throw new Error('Error encoding fractal module call data');
-  }
-
-  const fractalByteCodeLinear = generateContractByteCodeLinear(
-    getAddress(fractalModuleMasterCopyContract.address),
-  );
+  const fractalByteCodeLinear = generateContractByteCodeLinear(fractalModuleMasterCopyAddress);
 
   const fractalSalt = generateSalt(fractalModuleCalldata, saltNum);
-  const deployFractalModuleTx = buildDeployZodiacModuleTx(zodiacModuleProxyFactoryContract, [
-    fractalModuleMasterCopyContract.address,
-    fractalModuleCalldata,
-    saltNum,
-  ]);
-  const predictedFractalModuleAddress = generatePredictedModuleAddress(
-    getAddress(zodiacModuleProxyFactoryContract.address),
-    fractalSalt,
-    fractalByteCodeLinear,
+
+  const deployFractalModuleTx = buildContractCall(
+    abis.ModuleProxyFactory,
+    moduleProxyFactoryAddress,
+    'deployModule',
+    [fractalModuleMasterCopyAddress, fractalModuleCalldata, saltNum],
+    0,
+    false,
   );
 
+  const predictedFractalModuleAddress = getCreate2Address({
+    from: moduleProxyFactoryAddress,
+    salt: fractalSalt,
+    bytecodeHash: keccak256(encodePacked(['bytes'], [fractalByteCodeLinear])),
+  });
+
   const enableFractalModuleTx = buildContractCall(
-    safeContract,
+    GnosisSafeL2Abi,
+    safeAddress,
     'enableModule',
     [predictedFractalModuleAddress],
     0,

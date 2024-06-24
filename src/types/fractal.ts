@@ -1,22 +1,4 @@
 import {
-  FractalModule,
-  FractalRegistry,
-  GnosisSafeProxyFactory,
-  ModuleProxyFactory,
-  LinearERC20Voting,
-  Azorius,
-  AzoriusFreezeGuard,
-  ERC20Claim,
-  ERC20FreezeVoting,
-  MultisigFreezeVoting,
-  VotesERC20,
-  MultisigFreezeGuard,
-  VotesERC20Wrapper,
-  KeyValuePairs,
-  ERC721FreezeVoting,
-  LinearERC721Voting,
-} from '@fractal-framework/fractal-contracts';
-import {
   SafeMultisigTransactionWithTransfersResponse,
   SafeModuleTransactionWithTransfersResponse,
   EthereumTxWithTransfersResponse,
@@ -25,8 +7,6 @@ import {
 } from '@safe-global/safe-service-client';
 import { Dispatch } from 'react';
 import { Address } from 'viem';
-import { MultiSend } from '../assets/typechain-types/usul';
-import { GnosisSafeL2 } from '../assets/typechain-types/usul/@gnosis.pm/safe-contracts/contracts';
 import { FractalGovernanceActions } from '../providers/App/governance/action';
 import { GovernanceContractActions } from '../providers/App/governanceContracts/action';
 import { FractalGuardActions } from '../providers/App/guard/action';
@@ -34,7 +14,6 @@ import { GuardContractActions } from '../providers/App/guardContracts/action';
 import { TreasuryActions } from '../providers/App/treasury/action';
 import { NodeActions } from './../providers/App/node/action';
 import { ERC721TokenData, VotesTokenData } from './account';
-import { ContractConnection } from './contract';
 import { FreezeGuardType, FreezeVotingType } from './daoGovernance';
 import { ProposalData, MultisigProposal, AzoriusProposal, SnapshotProposal } from './daoProposal';
 import { TreasuryActivity } from './daoTreasury';
@@ -147,7 +126,7 @@ export enum FractalProposalState {
 export interface GovernanceActivity extends ActivityBase {
   state: FractalProposalState | null;
   proposalId: string;
-  targets: string[];
+  targets: Address[];
   data?: ProposalData;
 }
 
@@ -182,7 +161,6 @@ export interface ITokenAccount {
   delegatee: string | undefined;
   votingWeight?: bigint;
   votingWeightString: string | undefined;
-  isDelegatesSet: boolean | undefined;
 }
 
 /**
@@ -192,7 +170,6 @@ export interface ITokenAccount {
  * @param dispatch - This object contains the dispatch functions for the Fractal DAO.
  */
 export interface FractalStore extends Fractal {
-  baseContracts?: FractalContracts;
   action: {
     dispatch: Dispatch<FractalActions>;
     loadReadOnlyValues: () => Promise<void>;
@@ -221,12 +198,12 @@ export interface Fractal {
 }
 
 export interface FractalGovernanceContracts {
-  ozLinearVotingContractAddress?: string;
-  erc721LinearVotingContractAddress?: string;
-  azoriusContractAddress?: string;
-  votesTokenContractAddress?: string;
-  lockReleaseContractAddress?: string;
-  underlyingTokenAddress?: string;
+  linearVotingErc20Address?: Address;
+  linearVotingErc721Address?: Address;
+  moduleAzoriusAddress?: Address;
+  votesTokenAddress?: Address;
+  lockReleaseAddress?: Address;
+  underlyingTokenAddress?: Address;
   isLoaded: boolean;
 }
 
@@ -246,8 +223,7 @@ export interface Node
   extends Omit<FractalNode, 'safe' | 'fractalModules' | 'isModulesLoaded' | 'isHierarchyLoaded'> {}
 
 export interface FractalModuleData {
-  moduleContract: Azorius | FractalModule | undefined;
-  moduleAddress: string;
+  moduleAddress: Address;
   moduleType: FractalModuleType;
 }
 
@@ -257,8 +233,8 @@ export enum FractalModuleType {
   UNKNOWN,
 }
 export interface FractalGuardContracts {
-  freezeGuardContractAddress?: string;
-  freezeVotingContractAddress?: string;
+  freezeGuardContractAddress?: Address;
+  freezeVotingContractAddress?: Address;
   freezeGuardType: FreezeGuardType | null;
   freezeVotingType: FreezeVotingType | null;
   isGuardLoaded?: boolean;
@@ -294,13 +270,6 @@ export interface DecentGovernance extends AzoriusGovernance {
 }
 export interface SafeMultisigGovernance extends Governance {}
 
-// @todo update FractalContracts to just store addresses in the store
-// export interface Governance {
-//   type?: GovernanceType;
-//   proposals: FractalProposal[] | null;
-//   proposalTemplates?: ProposalTemplate[] | null;
-//   tokenClaimContractAddress?: string;
-// }
 export interface Governance {
   type?: GovernanceType;
   loadingProposals: boolean;
@@ -308,7 +277,7 @@ export interface Governance {
   proposals: FractalProposal[] | null;
   pendingProposals: string[] | null;
   proposalTemplates?: ProposalTemplate[] | null;
-  tokenClaimContract?: ERC20Claim;
+  tokenClaimContractAddress?: Address;
 }
 
 export interface VotingStrategyAzorius extends VotingStrategy {
@@ -338,27 +307,6 @@ export interface NodeHierarchy {
   childNodes: Node[];
 }
 
-export interface FractalContracts {
-  multiSendContract: ContractConnection<MultiSend>;
-  safeFactoryContract: ContractConnection<GnosisSafeProxyFactory>;
-  fractalAzoriusMasterCopyContract: ContractConnection<Azorius>;
-  linearVotingMasterCopyContract: ContractConnection<LinearERC20Voting>;
-  linearVotingERC721MasterCopyContract: ContractConnection<LinearERC721Voting>;
-  safeSingletonContract: ContractConnection<GnosisSafeL2>;
-  zodiacModuleProxyFactoryContract: ContractConnection<ModuleProxyFactory>;
-  fractalModuleMasterCopyContract: ContractConnection<FractalModule>;
-  fractalRegistryContract: ContractConnection<FractalRegistry>;
-  multisigFreezeGuardMasterCopyContract: ContractConnection<MultisigFreezeGuard>;
-  azoriusFreezeGuardMasterCopyContract: ContractConnection<AzoriusFreezeGuard>;
-  freezeMultisigVotingMasterCopyContract: ContractConnection<MultisigFreezeVoting>;
-  freezeERC20VotingMasterCopyContract: ContractConnection<ERC20FreezeVoting>;
-  freezeERC721VotingMasterCopyContract: ContractConnection<ERC721FreezeVoting>;
-  votesTokenMasterCopyContract: ContractConnection<VotesERC20>;
-  claimingMasterCopyContract: ContractConnection<ERC20Claim>;
-  votesERC20WrapperMasterCopyContract: ContractConnection<VotesERC20Wrapper>;
-  keyValuePairsContract: ContractConnection<KeyValuePairs>;
-}
-
 export type FractalProposal = AzoriusProposal | MultisigProposal | SnapshotProposal;
 
 /**
@@ -375,7 +323,7 @@ export interface ReadOnlyState {
 
 export interface ReadOnlyUser {
   /** The user's wallet address, if connected.  */
-  address?: string;
+  address?: Address;
   /** The number of delegated tokens for the connected Azorius DAO, 1 for a Multisig DAO signer */
   votingWeight: bigint;
 }

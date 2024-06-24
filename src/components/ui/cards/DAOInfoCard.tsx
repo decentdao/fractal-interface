@@ -86,7 +86,6 @@ export function DAOInfoCard() {
           {!!user.address && (
             <ManageDAOMenu
               parentAddress={parentAddress}
-              fractalNode={node}
               freezeGuard={guard}
               guardContracts={guardContracts}
             />

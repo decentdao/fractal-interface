@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { getAddress } from 'viem';
+import { Address } from 'viem';
 import { useAccount } from 'wagmi';
 import DaoCreator from '../../components/DaoCreator';
 import { DAOCreateMode } from '../../components/DaoCreator/formComponents/EstablishEssentials';
@@ -42,10 +42,10 @@ export default function DaoCreatePage() {
   }, [isConnected, t]);
 
   const successCallback = useCallback(
-    async (addressPrefix: string, daoAddress: string) => {
+    async (addressPrefix: string, daoAddress: Address) => {
       setRedirectPending(true);
       const daoFound = await requestWithRetries(
-        async () => (safeAPI ? safeAPI.getSafeCreationInfo(getAddress(daoAddress)) : undefined),
+        async () => (safeAPI ? safeAPI.getSafeCreationInfo(daoAddress) : undefined),
         8,
       );
       toggleFavorite(daoAddress);

@@ -1,37 +1,53 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { getAddress, isHex } from 'viem';
+import { encodeFunctionData, isHex } from 'viem';
+import { usePublicClient } from 'wagmi';
+import GnosisSafeL2Abi from '../../assets/abi/GnosisSafeL2';
+import MultiSendCallOnlyAbi from '../../assets/abi/MultiSendCallOnly';
 import { DAO_ROUTES } from '../../constants/routes';
 import { TxBuilderFactory } from '../../models/TxBuilderFactory';
 import { useFractal } from '../../providers/App/AppProvider';
 import { useNetworkConfig } from '../../providers/NetworkConfig/NetworkConfigProvider';
-import {
-  BaseContracts,
-  AzoriusContracts,
-  ProposalExecuteData,
-  AzoriusERC20DAO,
-  AzoriusERC721DAO,
-} from '../../types';
+import { ProposalExecuteData, AzoriusERC20DAO, AzoriusERC721DAO } from '../../types';
 import { useCanUserCreateProposal } from '../utils/useCanUserSubmitProposal';
-import useSignerOrProvider from '../utils/useSignerOrProvider';
 import useSubmitProposal from './proposal/useSubmitProposal';
 
 const useDeployAzorius = () => {
-  const signerOrProvider = useSignerOrProvider();
   const navigate = useNavigate();
   const {
-    contracts: { fallbackHandler },
+    contracts: {
+      compatibilityFallbackHandler,
+      votesErc20WrapperMasterCopy,
+      votesErc20MasterCopy,
+      keyValuePairs,
+      fractalRegistry,
+      gnosisSafeProxyFactory,
+      gnosisSafeL2Singleton,
+      zodiacModuleProxyFactory,
+      multiSendCallOnly,
+      claimErc20MasterCopy,
+      moduleFractalMasterCopy,
+      linearVotingErc20MasterCopy,
+      linearVotingErc721MasterCopy,
+      moduleAzoriusMasterCopy,
+      freezeGuardAzoriusMasterCopy,
+      freezeGuardMultisigMasterCopy,
+      freezeVotingErc20MasterCopy,
+      freezeVotingErc721MasterCopy,
+      freezeVotingMultisigMasterCopy,
+    },
     addressPrefix,
   } = useNetworkConfig();
   const {
     node: { daoAddress, safe },
-    baseContracts,
   } = useFractal();
 
   const { t } = useTranslation(['transaction', 'proposalMetadata']);
   const { submitProposal } = useSubmitProposal();
   const { canUserCreateProposal } = useCanUserCreateProposal();
+  const publicClient = usePublicClient();
+
   const deployAzorius = useCallback(
     async (
       daoData: AzoriusERC20DAO | AzoriusERC721DAO,
@@ -39,57 +55,33 @@ const useDeployAzorius = () => {
       shouldSetSnapshot?: boolean,
       customNonce?: number,
     ) => {
-      if (!daoAddress || !canUserCreateProposal || !safe || !baseContracts) {
+      if (!daoAddress || !canUserCreateProposal || !safe || !publicClient) {
         return;
       }
-      const {
-        multiSendContract,
-        safeFactoryContract,
-        safeSingletonContract,
-        linearVotingMasterCopyContract,
-        fractalAzoriusMasterCopyContract,
-        zodiacModuleProxyFactoryContract,
-        fractalRegistryContract,
-        fractalModuleMasterCopyContract,
-        multisigFreezeGuardMasterCopyContract,
-        azoriusFreezeGuardMasterCopyContract,
-        freezeMultisigVotingMasterCopyContract,
-        freezeERC20VotingMasterCopyContract,
-        votesTokenMasterCopyContract,
-        claimingMasterCopyContract,
-        votesERC20WrapperMasterCopyContract,
-        keyValuePairsContract,
-      } = baseContracts;
-      let azoriusContracts;
-
-      azoriusContracts = {
-        fractalAzoriusMasterCopyContract: fractalAzoriusMasterCopyContract.asProvider,
-        linearVotingMasterCopyContract: linearVotingMasterCopyContract.asProvider,
-        azoriusFreezeGuardMasterCopyContract: azoriusFreezeGuardMasterCopyContract.asProvider,
-        votesTokenMasterCopyContract: votesTokenMasterCopyContract.asProvider,
-        claimingMasterCopyContract: claimingMasterCopyContract.asProvider,
-        votesERC20WrapperMasterCopyContract: votesERC20WrapperMasterCopyContract.asProvider,
-      } as AzoriusContracts;
-
-      const builderBaseContracts = {
-        fractalModuleMasterCopyContract: fractalModuleMasterCopyContract.asProvider,
-        fractalRegistryContract: fractalRegistryContract.asProvider,
-        safeFactoryContract: safeFactoryContract.asProvider,
-        safeSingletonContract: safeSingletonContract.asProvider,
-        multisigFreezeGuardMasterCopyContract: multisigFreezeGuardMasterCopyContract.asProvider,
-        multiSendContract: multiSendContract.asProvider,
-        freezeERC20VotingMasterCopyContract: freezeERC20VotingMasterCopyContract.asProvider,
-        freezeMultisigVotingMasterCopyContract: freezeMultisigVotingMasterCopyContract.asProvider,
-        zodiacModuleProxyFactoryContract: zodiacModuleProxyFactoryContract.asProvider,
-        keyValuePairsContract: keyValuePairsContract.asProvider,
-      } as BaseContracts;
 
       const txBuilderFactory = new TxBuilderFactory(
-        signerOrProvider,
-        builderBaseContracts,
-        azoriusContracts,
+        publicClient,
+        true,
         daoData,
-        fallbackHandler,
+        compatibilityFallbackHandler,
+        votesErc20WrapperMasterCopy,
+        votesErc20MasterCopy,
+        keyValuePairs,
+        fractalRegistry,
+        gnosisSafeProxyFactory,
+        gnosisSafeL2Singleton,
+        zodiacModuleProxyFactory,
+        freezeGuardAzoriusMasterCopy,
+        freezeGuardMultisigMasterCopy,
+        freezeVotingErc20MasterCopy,
+        freezeVotingErc721MasterCopy,
+        freezeVotingMultisigMasterCopy,
+        multiSendCallOnly,
+        claimErc20MasterCopy,
+        moduleFractalMasterCopy,
+        linearVotingErc20MasterCopy,
+        linearVotingErc721MasterCopy,
+        moduleAzoriusMasterCopy,
         undefined,
         undefined,
       );
@@ -101,23 +93,24 @@ const useDeployAzorius = () => {
         owners: safe.owners,
       });
 
-      const encodedAddOwnerWithThreshold =
-        safeSingletonContract.asProvider.interface.encodeFunctionData('addOwnerWithThreshold', [
-          multiSendContract.asProvider.address,
-          1,
-        ]);
-      if (!isHex(encodedAddOwnerWithThreshold)) {
-        return;
+      if (!isHex(safeTx)) {
+        throw new Error('Encoded safeTx is not a hex string');
       }
-      const encodedMultisend = multiSendContract.asProvider.interface.encodeFunctionData(
-        'multiSend',
-        [safeTx],
-      );
-      if (!isHex(encodedMultisend)) {
-        return;
-      }
+
+      const encodedAddOwnerWithThreshold = encodeFunctionData({
+        abi: GnosisSafeL2Abi,
+        functionName: 'addOwnerWithThreshold',
+        args: [multiSendCallOnly, 1n],
+      });
+
+      const encodedMultisend = encodeFunctionData({
+        abi: MultiSendCallOnlyAbi,
+        functionName: 'multiSend',
+        args: [safeTx],
+      });
+
       const proposalData: ProposalExecuteData = {
-        targets: [daoAddress, getAddress(multiSendContract.asProvider.address)],
+        targets: [daoAddress, multiSendCallOnly],
         values: [0n, 0n],
         calldatas: [encodedAddOwnerWithThreshold, encodedMultisend],
         metaData: {
@@ -137,15 +130,32 @@ const useDeployAzorius = () => {
       });
     },
     [
-      signerOrProvider,
-      baseContracts,
-      t,
-      canUserCreateProposal,
       daoAddress,
-      submitProposal,
-      navigate,
+      canUserCreateProposal,
       safe,
-      fallbackHandler,
+      publicClient,
+      compatibilityFallbackHandler,
+      votesErc20WrapperMasterCopy,
+      votesErc20MasterCopy,
+      keyValuePairs,
+      fractalRegistry,
+      gnosisSafeProxyFactory,
+      gnosisSafeL2Singleton,
+      zodiacModuleProxyFactory,
+      freezeGuardAzoriusMasterCopy,
+      freezeGuardMultisigMasterCopy,
+      freezeVotingErc20MasterCopy,
+      freezeVotingErc721MasterCopy,
+      freezeVotingMultisigMasterCopy,
+      multiSendCallOnly,
+      claimErc20MasterCopy,
+      moduleFractalMasterCopy,
+      linearVotingErc20MasterCopy,
+      linearVotingErc721MasterCopy,
+      moduleAzoriusMasterCopy,
+      submitProposal,
+      t,
+      navigate,
       addressPrefix,
     ],
   );

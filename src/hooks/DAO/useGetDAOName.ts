@@ -1,22 +1,21 @@
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useCallback, useEffect, useState } from 'react';
-import { Address, PublicClient, getContract, parseAbi, getAddress } from 'viem';
+import { Address, PublicClient, getContract } from 'viem';
 import { usePublicClient } from 'wagmi';
-import { useFractal } from '../../providers/App/AppProvider';
-import { FractalContracts } from '../../types';
+import { useNetworkConfig } from '../../providers/NetworkConfig/NetworkConfigProvider';
 import { createAccountSubstring } from '../utils/useDisplayName';
-import { getNetworkConfig } from './../../providers/NetworkConfig/NetworkConfigProvider';
 import { demoData } from './loaders/loadDemoData';
 
 const getDAOName = async ({
   address,
   registryName,
   publicClient,
-  baseContracts,
+  fractalRegistry,
 }: {
   address: Address;
   registryName?: string | null;
   publicClient: PublicClient | undefined;
-  baseContracts: FractalContracts | undefined;
+  fractalRegistry: Address;
 }) => {
   if (!publicClient || !publicClient.chain) {
     throw new Error('Public client not available');
@@ -30,6 +29,7 @@ const getDAOName = async ({
       throw error;
     }
   });
+
   if (ensName) {
     return ensName;
   }
@@ -38,17 +38,9 @@ const getDAOName = async ({
     return registryName;
   }
 
-  if (!baseContracts) {
-    throw new Error('Base contracts not set');
-  }
-
-  const {
-    contracts: { fractalRegistry },
-  } = getNetworkConfig(publicClient.chain.id);
-
   const fractalRegistryContract = getContract({
-    abi: parseAbi(['event FractalNameUpdated(address indexed daoAddress, string daoName)']),
-    address: getAddress(fractalRegistry),
+    abi: abis.FractalRegistry,
+    address: fractalRegistry,
     client: publicClient,
   });
 
@@ -82,29 +74,33 @@ const useGetDAOName = ({
   registryName?: string | null;
   chainId?: number;
 }) => {
-  const publicClient = usePublicClient({
-    chainId,
-  });
-  const { baseContracts } = useFractal();
+  const publicClient = usePublicClient({ chainId });
+
+  const {
+    contracts: { fractalRegistry },
+  } = useNetworkConfig();
 
   const [daoName, setDaoName] = useState<string>();
   useEffect(() => {
-    getDAOName({ address, registryName, publicClient, baseContracts }).then(name => {
+    getDAOName({ address, registryName, publicClient, fractalRegistry }).then(name => {
       setDaoName(name);
     });
-  }, [address, baseContracts, publicClient, registryName]);
+  }, [address, publicClient, registryName, fractalRegistry]);
 
   return { daoName };
 };
 
 const useGetDAONameDeferred = () => {
   const publicClient = usePublicClient();
-  const { baseContracts } = useFractal();
+  const {
+    contracts: { fractalRegistry },
+  } = useNetworkConfig();
+
   return {
     getDAOName: useCallback(
       ({ address, registryName }: { address: Address; registryName?: string | null }) =>
-        getDAOName({ address, registryName, publicClient, baseContracts }),
-      [baseContracts, publicClient],
+        getDAOName({ address, registryName, publicClient, fractalRegistry }),
+      [publicClient, fractalRegistry],
     ),
   };
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getAddress } from 'viem';
+import { Address } from 'viem';
 import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
 import { encodePrefixedAddress } from '../../../utils/address';
 import { CacheKeys, CacheExpiry } from '../../utils/cache/cacheDefaults';
@@ -12,8 +12,8 @@ export const useAccountFavorites = () => {
   );
   const { addressPrefix } = useNetworkConfig();
 
-  const toggleFavorite = (address: string) => {
-    const addressWithPrefix = encodePrefixedAddress(getAddress(address), addressPrefix);
+  const toggleFavorite = (address: Address) => {
+    const addressWithPrefix = encodePrefixedAddress(address, addressPrefix);
     const favorites = getValue({ cacheName: CacheKeys.FAVORITES }) || [];
     let updatedFavorites: string[] = [];
     if (favorites.includes(addressWithPrefix)) {

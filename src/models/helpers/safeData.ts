@@ -1,56 +1,56 @@
-import { GnosisSafeProxyFactory } from '@fractal-framework/fractal-contracts';
 import {
   getCreate2Address,
   zeroAddress,
   zeroHash,
   keccak256,
   encodePacked,
-  getAddress,
   encodeFunctionData,
   isHex,
   hexToBigInt,
+  GetContractReturnType,
+  PublicClient,
+  Address,
 } from 'viem';
-import GnosisSafeL2ABI from '../../assets/abi/GnosisSafeL2';
-import { MultiSend } from '../../assets/typechain-types/usul';
-import { GnosisSafeL2 } from '../../assets/typechain-types/usul/@gnosis.pm/safe-contracts/contracts';
+import GnosisSafeL2Abi from '../../assets/abi/GnosisSafeL2';
+import GnosisSafeProxyFactoryAbi from '../../assets/abi/GnosisSafeProxyFactory';
 import { buildContractCall } from '../../helpers/crypto';
 import { SafeMultisigDAO } from '../../types';
 
 export const safeData = async (
-  multiSendContract: MultiSend,
-  safeFactoryContract: GnosisSafeProxyFactory,
-  safeSingletonContract: GnosisSafeL2,
+  multiSendCallOnlyAddress: Address,
+  safeFactoryContract: GetContractReturnType<typeof GnosisSafeProxyFactoryAbi, PublicClient>,
+  safeSingletonContract: GetContractReturnType<typeof GnosisSafeL2Abi, PublicClient>,
   daoData: SafeMultisigDAO,
   saltNum: bigint,
-  fallbackHandler: string,
-  hasAzorius?: boolean,
+  fallbackHandler: Address,
+  hasAzorius: boolean,
 ) => {
   const signers = hasAzorius
-    ? [multiSendContract.address]
-    : [...daoData.trustedAddresses, multiSendContract.address];
+    ? [multiSendCallOnlyAddress]
+    : [...daoData.trustedAddresses, multiSendCallOnlyAddress];
 
   const createSafeCalldata = encodeFunctionData({
     functionName: 'setup',
     args: [
       signers,
-      1, // Threshold
+      1n, // Threshold
       zeroAddress,
       zeroHash,
       fallbackHandler,
       zeroAddress,
-      0,
+      0n,
       zeroAddress,
     ],
-    abi: GnosisSafeL2ABI,
+    abi: GnosisSafeL2Abi,
   });
 
-  const safeFactoryContractProxyCreationCode = await safeFactoryContract.proxyCreationCode();
+  const safeFactoryContractProxyCreationCode = await safeFactoryContract.read.proxyCreationCode();
   if (!isHex(safeFactoryContractProxyCreationCode)) {
     throw new Error('Error retrieving proxy creation code from Safe Factory Contract ');
   }
 
   const predictedSafeAddress = getCreate2Address({
-    from: getAddress(safeFactoryContract.address),
+    from: safeFactoryContract.address,
     salt: keccak256(
       encodePacked(
         ['bytes', 'uint256'],
@@ -60,16 +60,14 @@ export const safeData = async (
     bytecodeHash: keccak256(
       encodePacked(
         ['bytes', 'uint256'],
-        [
-          safeFactoryContractProxyCreationCode,
-          hexToBigInt(getAddress(safeSingletonContract.address)),
-        ],
+        [safeFactoryContractProxyCreationCode, hexToBigInt(safeSingletonContract.address)],
       ),
     ),
   });
 
   const createSafeTx = buildContractCall(
-    safeFactoryContract,
+    GnosisSafeProxyFactoryAbi,
+    safeFactoryContract.address,
     'createProxyWithNonce',
     [safeSingletonContract.address, createSafeCalldata, saltNum],
     0,

@@ -1,7 +1,9 @@
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useEffect, useCallback, useRef } from 'react';
+import { getContract } from 'viem';
+import { usePublicClient } from 'wagmi';
 import { useFractal } from '../../../../providers/App/AppProvider';
 import { FractalGovernanceAction } from '../../../../providers/App/governance/action';
-import useSafeContracts from '../../../safe/useSafeContracts';
 // get list of approvals; approval [0] should be token claim
 // query using attach = masterTokenClaim.attach(approval[0]).queryFilter()
 // check if module is tokenClaim;
@@ -10,55 +12,62 @@ import useSafeContracts from '../../../safe/useSafeContracts';
 export function useERC20Claim() {
   const {
     node: { daoAddress },
-    governanceContracts: { votesTokenContractAddress },
+    governanceContracts: { votesTokenAddress },
     action,
   } = useFractal();
-  const baseContracts = useSafeContracts();
+  const publicClient = usePublicClient();
+
   const loadTokenClaimContract = useCallback(async () => {
-    if (!baseContracts || !votesTokenContractAddress) {
+    if (!votesTokenAddress || !publicClient) {
       return;
     }
-    const { claimingMasterCopyContract } = baseContracts;
 
-    const votesTokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(votesTokenContractAddress);
+    const votesTokenContract = getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
 
-    const approvalFilter = votesTokenContract.filters.Approval();
-    const approvals = await votesTokenContract.queryFilter(approvalFilter);
-    if (!approvals.length) {
+    // TODO here be dark programming...
+
+    const approvals = await votesTokenContract.getEvents.Approval();
+
+    if (approvals.length === 0 || !approvals[0].args.spender) {
       return;
     }
-    const possibleTokenClaimContract = claimingMasterCopyContract.asProvider.attach(
-      approvals[0].args[1],
-    );
-    const tokenClaimFilter = possibleTokenClaimContract.filters.ERC20ClaimCreated();
-    const tokenClaimArray = await possibleTokenClaimContract
-      .queryFilter(tokenClaimFilter)
+
+    const possibleTokenClaimContract = getContract({
+      abi: abis.ERC20Claim,
+      address: approvals[0].args.spender,
+      client: publicClient,
+    });
+
+    const tokenClaimArray = await possibleTokenClaimContract.getEvents
+      .ERC20ClaimCreated()
       .catch(() => []);
 
-    if (!tokenClaimArray.length || tokenClaimArray[0].args[1] === votesTokenContractAddress) {
+    const childToken = tokenClaimArray[0].args.childToken;
+
+    if (!tokenClaimArray.length || !childToken || childToken === votesTokenAddress) {
       return;
     }
     // action to governance
     action.dispatch({
       type: FractalGovernanceAction.SET_CLAIMING_CONTRACT,
-      payload: possibleTokenClaimContract,
+      payload: approvals[0].args.spender,
     });
-  }, [baseContracts, votesTokenContractAddress, action]);
+  }, [action, publicClient, votesTokenAddress]);
+
   const loadKey = useRef<string>();
 
   useEffect(() => {
-    if (
-      daoAddress &&
-      votesTokenContractAddress &&
-      daoAddress + votesTokenContractAddress !== loadKey.current
-    ) {
-      loadKey.current = daoAddress + votesTokenContractAddress;
+    if (daoAddress && votesTokenAddress && daoAddress + votesTokenAddress !== loadKey.current) {
+      loadKey.current = daoAddress + votesTokenAddress;
       loadTokenClaimContract();
     }
-    if (!daoAddress || !votesTokenContractAddress) {
+    if (!daoAddress || !votesTokenAddress) {
       loadKey.current = undefined;
     }
-  }, [loadTokenClaimContract, daoAddress, votesTokenContractAddress]);
+  }, [loadTokenClaimContract, daoAddress, votesTokenAddress]);
   return;
 }

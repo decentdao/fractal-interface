@@ -25,7 +25,6 @@ function GuardDetails(props: ICreationStepProps) {
   const {
     node: { safe },
     governance,
-    governanceContracts: { azoriusContractAddress },
     readOnly: { dao },
   } = useFractal();
   const { type } = governance;
@@ -47,7 +46,7 @@ function GuardDetails(props: ICreationStepProps) {
       setFieldValue('multisig.customNonce', safe.nextNonce);
       setShowCustomNonce(true);
     }
-  }, [isSubDAO, azoriusContractAddress, type, setFieldValue, safe, dao, showCustomNonce]);
+  }, [isSubDAO, type, setFieldValue, safe, dao, showCustomNonce]);
 
   useEffect(() => {
     // set the initial value for freezeGuard.freezeVotesThreshold

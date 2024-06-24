@@ -3,7 +3,7 @@ import {
   SafeCollectibleResponse,
   TransferResponse,
 } from '@safe-global/safe-service-client';
-import { ContractEvent } from './contract';
+import { Address } from 'viem';
 import { ActivityBase } from './fractal';
 import { AllTransfersListResponse } from './safeGlobal';
 import { EthAddress } from './utils';
@@ -13,10 +13,11 @@ export enum TokenEventType {
   WITHDRAW = 'WITHDRAW',
 }
 
-export interface TokenEvent extends ContractEvent {
+export interface TokenEvent {
   transactionHash: string;
   blockNumber: number;
   eventType: TokenEventType;
+  blockTimestamp: number;
 }
 
 export interface TokenDepositEvent extends TokenEvent, EthAddress {
@@ -64,7 +65,7 @@ export enum TokenType {
 
 export interface TokenInfo {
   type: TokenType;
-  address: string;
+  address: Address;
   name: string;
   symbol: string;
   logoUri: string;
@@ -87,7 +88,7 @@ export enum TreasuryActivityTypes {
 }
 
 export interface TreasuryActivity extends ActivityBase {
-  transferAddresses: string[];
+  transferAddresses: Address[];
   transferAmountTotals: string[];
   isDeposit: boolean;
 }

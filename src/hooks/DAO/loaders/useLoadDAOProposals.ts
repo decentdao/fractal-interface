@@ -21,7 +21,7 @@ export const useLoadDAOProposals = () => {
     clearIntervals();
     if (type === GovernanceType.AZORIUS_ERC20 || type === GovernanceType.AZORIUS_ERC721) {
       // load Azorius proposals and strategies
-      return loadAzoriusProposals(proposal => {
+      await loadAzoriusProposals(proposal => {
         action.dispatch({
           type: FractalGovernanceAction.SET_AZORIUS_PROPOSAL,
           payload: proposal,

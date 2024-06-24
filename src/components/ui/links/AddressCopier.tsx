@@ -1,11 +1,12 @@
 import { ButtonProps } from '@chakra-ui/react';
 import { CopySimple } from '@phosphor-icons/react';
+import { Address } from 'viem';
 import { useCopyText } from '../../../hooks/utils/useCopyText';
 import useDisplayName from '../../../hooks/utils/useDisplayName';
 import CeleryButtonWithIcon from '../utils/CeleryButtonWithIcon';
 
 interface AddressCopierProps extends ButtonProps {
-  address: string;
+  address: Address;
 }
 
 /**

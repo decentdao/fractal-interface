@@ -2,6 +2,7 @@ import { Flex, Text, Spinner, Icon } from '@chakra-ui/react';
 import { WarningCircle } from '@phosphor-icons/react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Address } from 'viem';
 import { SafeDisplayRow } from '../../../../pages/home/SafeDisplayRow';
 import { useFractal } from '../../../../providers/App/AppProvider';
 import { useNetworkConfig } from '../../../../providers/NetworkConfig/NetworkConfigProvider';
@@ -11,7 +12,7 @@ import { MySafesErrorFallback } from '../../utils/MySafesErrorFallback';
 interface ISearchDisplay {
   loading: boolean;
   errorMessage: string | undefined;
-  address: string | undefined;
+  address: Address | undefined;
   onClickView: Function;
   closeDrawer?: () => void;
 }

@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Image, MenuItem, Spacer, Text } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { getAddress } from 'viem';
+import { Address } from 'viem';
 import { useSwitchChain } from 'wagmi';
 import { DAO_ROUTES } from '../../../../constants/routes';
 import { useGetDAOName } from '../../../../hooks/DAO/useGetDAOName';
@@ -12,8 +12,8 @@ import { getChainIdFromPrefix, getNetworkIcon } from '../../../../utils/url';
 import Avatar from '../../page/Header/Avatar';
 
 export interface SafeMenuItemProps {
-  address: string;
   network: string;
+  address: Address;
   showAddress?: boolean;
   onClick?: () => void;
 }
@@ -23,9 +23,10 @@ export function SafeMenuItem({ address, network }: SafeMenuItemProps) {
   const { switchChain } = useSwitchChain();
 
   const { daoName } = useGetDAOName({
-    address: getAddress(address),
+    address: address,
     chainId: getChainIdFromPrefix(network),
   });
+
   const navigate = useNavigate();
 
   const { displayName: accountDisplayName } = useDisplayName(

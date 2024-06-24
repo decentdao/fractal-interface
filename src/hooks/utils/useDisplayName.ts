@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getAddress } from 'viem';
+import { Address } from 'viem';
 import { useEnsName } from 'wagmi';
 import { useNetworkConfig } from '../../providers/NetworkConfig/NetworkConfigProvider';
 
@@ -16,11 +16,11 @@ export const createAccountSubstring = (account: string) => {
  * display name for a DAO, use the useDAOName hook instead.
  * @todo Should switch to object for props
  */
-const useDisplayName = (account?: string | null, truncate?: boolean, chainId?: number) => {
+const useDisplayName = (account?: Address | null, truncate?: boolean, chainId?: number) => {
   if (truncate === undefined) truncate = true;
   const { chain } = useNetworkConfig();
   const { data: ensName } = useEnsName({
-    address: !!account ? getAddress(account) : undefined,
+    address: !!account ? account : undefined,
     chainId: chainId || chain.id,
   });
 

@@ -3,10 +3,11 @@ import { WarningCircle } from '@phosphor-icons/react';
 import { Field, FieldAttributes, Formik } from 'formik';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Address, getAddress } from 'viem';
+import { usePublicClient } from 'wagmi';
 import * as Yup from 'yup';
 import { useValidationAddress } from '../../../../../../hooks/schemas/common/useValidationAddress';
 import { useFractal } from '../../../../../../providers/App/AppProvider';
-import { useEthersSigner } from '../../../../../../providers/Ethers/hooks/useEthersSigner';
 import { validateENSName } from '../../../../../../utils/url';
 import SupportTooltip from '../../../../../ui/badges/SupportTooltip';
 import { CustomNonceInput } from '../../../../../ui/forms/CustomNonceInput';
@@ -21,14 +22,14 @@ function AddSignerModal({
   currentThreshold,
 }: {
   close: () => void;
-  signers: string[];
+  signers: Address[];
   currentThreshold: number;
 }) {
   const {
     node: { daoAddress, safe },
   } = useFractal();
   const { t } = useTranslation(['modals', 'common']);
-  const signer = useEthersSigner();
+  const publicClient = usePublicClient();
   const { addressValidationTest, newSignerValidationTest } = useValidationAddress();
   const tooltipContainer = useRef<HTMLDivElement>(null);
 
@@ -38,19 +39,22 @@ function AddSignerModal({
     async (values: { address: string; threshold: number; nonce: number }) => {
       const { address, nonce, threshold } = values;
       let validAddress = address;
-      if (validateENSName(validAddress) && signer) {
-        validAddress = await signer.resolveName(address);
+      if (validateENSName(validAddress) && publicClient) {
+        const maybeEnsAddress = await publicClient.getEnsAddress({ name: address });
+        if (maybeEnsAddress) {
+          validAddress = maybeEnsAddress;
+        }
       }
 
       await addSigner({
-        newSigner: validAddress,
+        newSigner: getAddress(validAddress),
         threshold: threshold,
         nonce: nonce,
         daoAddress: daoAddress,
         close: close,
       });
     },
-    [addSigner, close, daoAddress, signer],
+    [addSigner, close, daoAddress, publicClient],
   );
 
   const addSignerValidationSchema = Yup.object().shape({
@@ -80,7 +84,6 @@ function AddSignerModal({
               <Text>{t('addSignerLabel', { ns: 'modals' })}</Text>
               <Field name={'address'}>
                 {({ field }: FieldAttributes<any>) => (
-                  // LabelWrapper title styling needs to updated on @decent-org/fractal-ui, it seems
                   <LabelWrapper
                     subLabel={t('addSignerSublabel', { ns: 'modals' })}
                     errorMessage={field.value && errors.address}

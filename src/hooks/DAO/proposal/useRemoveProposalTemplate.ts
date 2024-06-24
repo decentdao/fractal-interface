@@ -1,20 +1,24 @@
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useCallback } from 'react';
-import { isHex, getAddress } from 'viem';
+import { encodeFunctionData } from 'viem';
 import { useFractal } from '../../../providers/App/AppProvider';
 import useIPFSClient from '../../../providers/App/hooks/useIPFSClient';
+import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
 import { ProposalExecuteData } from '../../../types';
-import useSafeContracts from '../../safe/useSafeContracts';
 
 export default function useRemoveProposalTemplate() {
-  const keyValuePairsContract = useSafeContracts()?.keyValuePairsContract;
   const client = useIPFSClient();
   const {
     governance: { proposalTemplates },
   } = useFractal();
 
+  const {
+    contracts: { keyValuePairs },
+  } = useNetworkConfig();
+
   const prepareRemoveProposalTemplateProposal = useCallback(
     async (templateIndex: number) => {
-      if (proposalTemplates && keyValuePairsContract) {
+      if (proposalTemplates) {
         const proposalMetadata = {
           title: 'removeProposalTemplateTitle',
           description: 'removeProposalTemplateDescription',
@@ -27,16 +31,15 @@ export default function useRemoveProposalTemplate() {
 
         const { Hash } = await client.add(JSON.stringify(updatedTemplatesList));
 
-        const encodedUpdateValues = keyValuePairsContract.asProvider.interface.encodeFunctionData(
-          'updateValues',
-          [['proposalTemplates'], [Hash]],
-        );
-        if (!isHex(encodedUpdateValues)) {
-          return;
-        }
+        const encodedUpdateValues = encodeFunctionData({
+          abi: abis.KeyValuePairs,
+          functionName: 'updateValues',
+          args: [['proposalTemplates'], [Hash]],
+        });
+
         const proposal: ProposalExecuteData = {
           metaData: proposalMetadata,
-          targets: [getAddress(keyValuePairsContract.asProvider.address)],
+          targets: [keyValuePairs],
           values: [0n],
           calldatas: [encodedUpdateValues],
         };
@@ -44,7 +47,7 @@ export default function useRemoveProposalTemplate() {
         return proposal;
       }
     },
-    [proposalTemplates, keyValuePairsContract, client],
+    [client, keyValuePairs, proposalTemplates],
   );
 
   return { prepareRemoveProposalTemplateProposal };

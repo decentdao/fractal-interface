@@ -1,4 +1,4 @@
-import { MultisigFreezeGuard } from '@fractal-framework/fractal-contracts';
+import { abis } from '@fractal-framework/fractal-contracts';
 import {
   AllTransactionsListResponse,
   EthereumTxWithTransfersResponse,
@@ -6,10 +6,10 @@ import {
   TransferWithTokenInfoResponse,
 } from '@safe-global/safe-service-client';
 import { useCallback } from 'react';
-import { zeroAddress } from 'viem';
+import { Address, getAddress, getContract, zeroAddress } from 'viem';
+import { usePublicClient } from 'wagmi';
 import { isApproved, isRejected } from '../../helpers/activity';
 import { useFractal } from '../../providers/App/AppProvider';
-import { useEthersProvider } from '../../providers/Ethers/hooks/useEthersProvider';
 import { useNetworkConfig } from '../../providers/NetworkConfig/NetworkConfigProvider';
 import {
   AssetTotals,
@@ -21,7 +21,6 @@ import {
 import { formatWeiToValue, isModuleTx, isMultiSigTx, parseDecodedData } from '../../utils';
 import { getAverageBlockTime } from '../../utils/contract';
 import { getTxTimelockedTimestamp } from '../../utils/guard';
-import useSafeContracts from '../safe/useSafeContracts';
 import { useSafeDecoder } from './useSafeDecoder';
 
 type FreezeGuardData = {
@@ -32,18 +31,17 @@ type FreezeGuardData = {
 
 export const useSafeTransactions = () => {
   const { chain } = useNetworkConfig();
-  const provider = useEthersProvider();
   const { guardContracts } = useFractal();
-  const baseContracts = useSafeContracts();
   const decode = useSafeDecoder();
+  const publicClient = usePublicClient();
 
   const getState = useCallback(
     async (
       activities: Activity[],
-      freezeGuard?: MultisigFreezeGuard,
+      freezeGuardAddress?: Address,
       freezeGuardData?: FreezeGuardData,
     ) => {
-      if (freezeGuard && freezeGuardData && provider) {
+      if (freezeGuardAddress && freezeGuardData && publicClient) {
         return Promise.all(
           activities.map(async (activity, _, activityArr) => {
             if (activity.eventType !== ActivityEventType.Governance || !activity.transaction) {
@@ -71,7 +69,7 @@ export const useSafeTransactions = () => {
             } else {
               // it's not executed or rejected, so we need to check the timelock status
               const timelockedTimestampMs =
-                (await getTxTimelockedTimestamp(activity, freezeGuard, provider)) * 1000;
+                (await getTxTimelockedTimestamp(activity, freezeGuardAddress, publicClient)) * 1000;
               if (timelockedTimestampMs === 0) {
                 // not yet timelocked
                 if (isApproved(multiSigTransaction)) {
@@ -136,7 +134,7 @@ export const useSafeTransactions = () => {
         });
       }
     },
-    [provider],
+    [publicClient],
   );
 
   const getTransferTotal = useCallback(
@@ -191,7 +189,7 @@ export const useSafeTransactions = () => {
 
   const parseTransactions = useCallback(
     async (transactions: AllTransactionsListResponse, daoAddress: string) => {
-      if (!transactions.results.length || !provider) {
+      if (!transactions.results.length) {
         return [];
       }
 
@@ -230,7 +228,9 @@ export const useSafeTransactions = () => {
 
           // maps address for each transfer
           const transferAddresses = transaction.transfers.map(transfer =>
-            transfer.to.toLowerCase() === daoAddress.toLowerCase() ? transfer.from : transfer.to,
+            transfer.to.toLowerCase() === daoAddress.toLowerCase()
+              ? getAddress(transfer.from)
+              : getAddress(transfer.to),
           );
 
           // @note this indentifies transaction a simple ETH transfer
@@ -244,7 +244,7 @@ export const useSafeTransactions = () => {
             transferAmountTotals.push(
               `${formatWeiToValue(multiSigTransaction.value, 18)} ${chain.nativeCurrency.symbol}`,
             );
-            transferAddresses.push(multiSigTransaction.to);
+            transferAddresses.push(getAddress(multiSigTransaction.to));
           }
 
           const eventSafeTxHash = multiSigTransaction.safeTxHash;
@@ -283,14 +283,14 @@ export const useSafeTransactions = () => {
               : {
                   decodedTransactions: await decode(
                     multiSigTransaction.value,
-                    multiSigTransaction.to,
+                    getAddress(multiSigTransaction.to),
                     multiSigTransaction.data,
                   ),
                 };
 
           const targets = data
             ? [...data.decodedTransactions.map(tx => tx.target)]
-            : [transaction.to];
+            : [getAddress(transaction.to)];
 
           const activity: Activity = {
             transaction,
@@ -318,31 +318,47 @@ export const useSafeTransactions = () => {
           return activity;
         }),
       );
-      let freezeGuard: MultisigFreezeGuard | undefined;
       let freezeGuardData: FreezeGuardData | undefined;
 
-      if (guardContracts.freezeGuardContractAddress && baseContracts) {
-        const blockNumber = await provider.getBlockNumber();
-        const averageBlockTime = BigInt(Math.round(await getAverageBlockTime(provider)));
-        freezeGuard = baseContracts.multisigFreezeGuardMasterCopyContract.asProvider.attach(
-          guardContracts.freezeGuardContractAddress,
-        );
+      if (guardContracts.freezeGuardContractAddress && publicClient) {
+        const blockNumber = await publicClient.getBlockNumber();
+        const averageBlockTime = BigInt(Math.round(await getAverageBlockTime(publicClient)));
+        const freezeGuard = getContract({
+          address: guardContracts.freezeGuardContractAddress,
+          abi: abis.MultisigFreezeGuard,
+          client: publicClient,
+        });
 
-        const timelockPeriod = BigInt(await freezeGuard.timelockPeriod());
-        const executionPeriod = BigInt(await freezeGuard.executionPeriod());
+        const [timelockPeriod, executionPeriod, block] = await Promise.all([
+          freezeGuard.read.timelockPeriod(),
+          freezeGuard.read.executionPeriod(),
+          publicClient.getBlock({ blockNumber: blockNumber }),
+        ]);
+
         freezeGuardData = {
-          guardTimelockPeriodMs: timelockPeriod * averageBlockTime * 1000n,
-          guardExecutionPeriodMs: executionPeriod * averageBlockTime * 1000n,
-          lastBlockTimestamp: (await provider.getBlock(blockNumber)).timestamp,
+          guardTimelockPeriodMs: BigInt(timelockPeriod) * BigInt(averageBlockTime) * 1000n,
+          guardExecutionPeriodMs: BigInt(executionPeriod) * BigInt(averageBlockTime) * 1000n,
+          lastBlockTimestamp: Number(block.timestamp),
         };
       }
 
-      const activitiesWithState = await getState(activities, freezeGuard, freezeGuardData);
-
       // todo: Some of these activities may be completed and can be cached
+      const activitiesWithState = await getState(
+        activities,
+        guardContracts.freezeGuardContractAddress,
+        freezeGuardData,
+      );
+
       return activitiesWithState;
     },
-    [guardContracts, getState, getTransferTotal, decode, chain, provider, baseContracts],
+    [
+      chain.nativeCurrency.symbol,
+      decode,
+      getState,
+      getTransferTotal,
+      guardContracts.freezeGuardContractAddress,
+      publicClient,
+    ],
   );
   return { parseTransactions };
 };

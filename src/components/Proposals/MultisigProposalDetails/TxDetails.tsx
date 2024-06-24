@@ -2,6 +2,7 @@ import { Box, Text, Flex } from '@chakra-ui/react';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useTranslation } from 'react-i18next';
+import { getAddress } from 'viem';
 import { createAccountSubstring } from '../../../hooks/utils/useDisplayName';
 import { MultisigProposal } from '../../../types';
 import { DEFAULT_DATE_TIME_FORMAT } from '../../../utils/numberFormats';
@@ -52,7 +53,7 @@ export function TxDetails({ proposal }: { proposal: MultisigProposal }) {
           tooltip={formatInTimeZone(proposal.eventDate, 'GMT', DEFAULT_DATE_TIME_FORMAT)}
         />
         <Flex mt="1rem">
-          <ProposalCreatedBy proposer={proposal.confirmations[0].owner} />
+          <ProposalCreatedBy proposer={getAddress(proposal.confirmations[0].owner)} />
         </Flex>
         <InfoRow
           property={t('transactionHash')}

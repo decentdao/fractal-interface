@@ -1,8 +1,10 @@
-import { useCallback, useEffect } from 'react';
+import { abis } from '@fractal-framework/fractal-contracts';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getContract } from 'viem';
+import { useWalletClient } from 'wagmi';
 import { useFractal } from '../../providers/App/AppProvider';
 import { FreezeVotingType } from '../../types';
-import useSafeContracts from '../safe/useSafeContracts';
 import { useTransaction } from '../utils/useTransaction';
 import useUserERC721VotingTokens from './proposal/useUserERC721VotingTokens';
 
@@ -11,57 +13,87 @@ const useCastFreezeVote = ({
 }: {
   setPending: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
-  const [contractCallCastFreeze, contractCallPending] = useTransaction();
+  const [contractCall, pending] = useTransaction();
   const {
     guardContracts: { freezeVotingContractAddress, freezeVotingType },
     node: {
       nodeHierarchy: { parentAddress },
     },
   } = useFractal();
-  const baseContracts = useSafeContracts();
   const { getUserERC721VotingTokens } = useUserERC721VotingTokens(null, undefined, false);
 
-  useEffect(() => {
-    setPending(contractCallPending);
-  }, [setPending, contractCallPending]);
+  setPending(pending);
 
   const { t } = useTranslation('transaction');
+  const { data: walletClient } = useWalletClient();
 
   const castFreezeVote = useCallback(() => {
-    if (!freezeVotingContractAddress || !baseContracts) return;
-    contractCallCastFreeze({
-      contractFn: () => {
-        if (freezeVotingType === FreezeVotingType.ERC721) {
-          const freezeERC721VotingContract =
-            baseContracts.freezeERC721VotingMasterCopyContract.asSigner.attach(
-              freezeVotingContractAddress,
-            );
-          return getUserERC721VotingTokens(parentAddress, undefined).then(tokensInfo =>
-            freezeERC721VotingContract['castFreezeVote(address[],uint256[])'](
+    if (!freezeVotingContractAddress) return;
+
+    if (freezeVotingType === FreezeVotingType.ERC721) {
+      if (!walletClient) return;
+
+      contractCall({
+        contractFn: () => {
+          const freezeERC721VotingContract = getContract({
+            abi: abis.ERC721FreezeVoting,
+            address: freezeVotingContractAddress,
+            client: walletClient,
+          });
+          return getUserERC721VotingTokens(parentAddress, undefined).then(tokensInfo => {
+            return freezeERC721VotingContract.write.castFreezeVote([
               tokensInfo.totalVotingTokenAddresses,
-              tokensInfo.totalVotingTokenIds,
-            ),
-          );
-        } else {
-          const freezeVotingContract =
-            baseContracts.freezeMultisigVotingMasterCopyContract.asSigner.attach(
-              freezeVotingContractAddress,
-            );
-          return freezeVotingContract.castFreezeVote();
-        }
-      },
-      pendingMessage: t('pendingCastFreezeVote'),
-      failedMessage: t('failedCastFreezeVote'),
-      successMessage: t('successCastFreezeVote'),
-    });
+              tokensInfo.totalVotingTokenIds.map(i => BigInt(i)),
+            ]);
+          });
+        },
+        pendingMessage: t('pendingCastFreezeVote'),
+        failedMessage: t('failedCastFreezeVote'),
+        successMessage: t('successCastFreezeVote'),
+      });
+    } else if (freezeVotingType === FreezeVotingType.ERC20) {
+      if (!walletClient) return;
+
+      contractCall({
+        contractFn: () => {
+          const freezeERC20VotingContract = getContract({
+            abi: abis.ERC20FreezeVoting,
+            address: freezeVotingContractAddress,
+            client: walletClient,
+          });
+          return freezeERC20VotingContract.write.castFreezeVote();
+        },
+        pendingMessage: t('pendingCastFreezeVote'),
+        failedMessage: t('failedCastFreezeVote'),
+        successMessage: t('successCastFreezeVote'),
+      });
+    } else if (freezeVotingType === FreezeVotingType.MULTISIG) {
+      if (!walletClient) return;
+
+      contractCall({
+        contractFn: () => {
+          const freezeMultisigVotingContract = getContract({
+            abi: abis.MultisigFreezeVoting,
+            address: freezeVotingContractAddress,
+            client: walletClient,
+          });
+          return freezeMultisigVotingContract.write.castFreezeVote();
+        },
+        pendingMessage: t('pendingCastFreezeVote'),
+        failedMessage: t('failedCastFreezeVote'),
+        successMessage: t('successCastFreezeVote'),
+      });
+    } else {
+      throw new Error('unknown freezeVotingType');
+    }
   }, [
-    contractCallCastFreeze,
-    t,
+    contractCall,
     freezeVotingContractAddress,
     freezeVotingType,
     getUserERC721VotingTokens,
     parentAddress,
-    baseContracts,
+    t,
+    walletClient,
   ]);
   return castFreezeVote;
 };

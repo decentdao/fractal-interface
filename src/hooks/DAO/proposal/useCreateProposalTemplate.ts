@@ -1,25 +1,29 @@
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useCallback } from 'react';
-import { isHex, getAddress } from 'viem';
+import { encodeFunctionData } from 'viem';
+import { normalize } from 'viem/ens';
+import { usePublicClient } from 'wagmi';
 import { useFractal } from '../../../providers/App/AppProvider';
 import useIPFSClient from '../../../providers/App/hooks/useIPFSClient';
+import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
 import { ProposalExecuteData } from '../../../types';
 import { CreateProposalForm } from '../../../types/proposalBuilder';
 import { validateENSName } from '../../../utils/url';
-import useSafeContracts from '../../safe/useSafeContracts';
-import useSignerOrProvider from '../../utils/useSignerOrProvider';
 
 export default function useCreateProposalTemplate() {
-  const signerOrProvider = useSignerOrProvider();
-
-  const keyValuePairsContract = useSafeContracts()?.keyValuePairsContract;
+  const publicClient = usePublicClient();
   const client = useIPFSClient();
   const {
     governance: { proposalTemplates },
   } = useFractal();
 
+  const {
+    contracts: { keyValuePairs },
+  } = useNetworkConfig();
+
   const prepareProposalTemplateProposal = useCallback(
     async (values: CreateProposalForm) => {
-      if (proposalTemplates && signerOrProvider && keyValuePairsContract) {
+      if (proposalTemplates && publicClient) {
         const proposalMetadata = {
           title: 'createProposalTemplateTitle',
           description: 'createProposalTemplateDescription',
@@ -33,7 +37,7 @@ export default function useCreateProposalTemplate() {
             values.transactions.map(async tx => ({
               ...tx,
               targetAddress: validateENSName(tx.targetAddress)
-                ? await signerOrProvider.resolveName(tx.targetAddress)
+                ? await publicClient.getEnsAddress({ name: normalize(tx.targetAddress) })
                 : tx.targetAddress,
               parameters: tx.parameters
                 .map(param => {
@@ -53,17 +57,15 @@ export default function useCreateProposalTemplate() {
 
         const { Hash } = await client.add(JSON.stringify(updatedTemplatesList));
 
-        const encodedUpdateValues = keyValuePairsContract.asProvider.interface.encodeFunctionData(
-          'updateValues',
-          [['proposalTemplates'], [Hash]],
-        );
-        if (!isHex(encodedUpdateValues)) {
-          return;
-        }
+        const encodedUpdateValues = encodeFunctionData({
+          abi: abis.KeyValuePairs,
+          functionName: 'updateValues',
+          args: [['proposalTemplates'], [Hash]],
+        });
 
         const proposal: ProposalExecuteData = {
           metaData: proposalMetadata,
-          targets: [getAddress(keyValuePairsContract.asProvider.address)],
+          targets: [keyValuePairs],
           values: [0n],
           calldatas: [encodedUpdateValues],
         };
@@ -71,7 +73,7 @@ export default function useCreateProposalTemplate() {
         return proposal;
       }
     },
-    [proposalTemplates, keyValuePairsContract, client, signerOrProvider],
+    [client, keyValuePairs, proposalTemplates, publicClient],
   );
 
   return { prepareProposalTemplateProposal };

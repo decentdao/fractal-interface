@@ -1,6 +1,7 @@
 import { Flex, Text, Icon, LinkProps } from '@chakra-ui/react';
 import { ArrowUpRight } from '@phosphor-icons/react';
 import { ReactNode } from 'react';
+import { Address } from 'viem';
 import useDisplayName from '../../../hooks/utils/useDisplayName';
 import EtherscanLink from './EtherscanLink';
 
@@ -11,7 +12,7 @@ export function DisplayAddress({
   isTextLink,
   ...rest
 }: {
-  address: string;
+  address: Address;
   truncate?: boolean;
   isTextLink?: boolean;
   children?: ReactNode;

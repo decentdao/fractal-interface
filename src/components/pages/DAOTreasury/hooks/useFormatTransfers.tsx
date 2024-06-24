@@ -1,3 +1,4 @@
+import { Address, getAddress } from 'viem';
 import { useNetworkConfig } from '../../../../providers/NetworkConfig/NetworkConfigProvider';
 import { TransferType, TokenInfo, AssetTransfer } from '../../../../types';
 import { formatCoin } from '../../../../utils/numberFormats';
@@ -13,10 +14,10 @@ export interface TransferDisplayData {
   image: string;
   assetDisplay: string;
   fullCoinTotal: string | undefined;
-  transferAddress: string;
+  transferAddress: Address;
   isLast: boolean;
   transactionHash: string;
-  tokenId: string;
+  tokenId: Address;
   tokenInfo?: TokenInfo;
 }
 
@@ -60,10 +61,11 @@ export function useFormatTransfers(
         transfer.type === TransferType.ERC721_TRANSFER
           ? undefined
           : formatCoin(transfer.value, false, transfer?.tokenInfo?.decimals, symbol),
-      transferAddress: safeAddress === transfer.from ? transfer.to : transfer.from,
+      transferAddress:
+        safeAddress === transfer.from ? getAddress(transfer.to) : getAddress(transfer.from),
       isLast: transfers[transfers.length - 1] === transfer,
       transactionHash: transfer.transactionHash,
-      tokenId: transfer?.tokenId,
+      tokenId: getAddress(transfer?.tokenId),
       tokenInfo: transfer.tokenInfo,
     };
     displayData[i] = formatted;

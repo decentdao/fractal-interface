@@ -2,11 +2,11 @@ import { FractalGovernanceContracts } from '../../../types';
 import { GovernanceContractAction, GovernanceContractActions } from './action';
 
 export const initialGovernanceContractsState: FractalGovernanceContracts = {
-  erc721LinearVotingContractAddress: undefined,
-  ozLinearVotingContractAddress: undefined,
-  azoriusContractAddress: undefined,
-  votesTokenContractAddress: undefined,
-  lockReleaseContractAddress: undefined,
+  linearVotingErc721Address: undefined,
+  linearVotingErc20Address: undefined,
+  moduleAzoriusAddress: undefined,
+  votesTokenAddress: undefined,
+  lockReleaseAddress: undefined,
   isLoaded: false,
 };
 
@@ -15,7 +15,7 @@ export const governanceContractsReducer = (
   action: GovernanceContractActions,
 ) => {
   switch (action.type) {
-    case GovernanceContractAction.SET_GOVERNANCE_CONTRACT:
+    case GovernanceContractAction.SET_GOVERNANCE_CONTRACT_ADDRESSES:
       return { ...action.payload, isLoaded: true };
     default:
       return state;

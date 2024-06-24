@@ -1,5 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
-import { isAddress } from 'viem';
+import { isAddress, getAddress } from 'viem';
 import { useFractal } from '../../providers/App/AppProvider';
 import { useNetworkConfig } from '../../providers/NetworkConfig/NetworkConfigProvider';
 import { useAzoriusListeners } from './loaders/governance/useAzoriusListeners';
@@ -39,7 +39,7 @@ export default function useDAOController() {
 
   const { errorLoading } = useFractalNode(skip, {
     addressPrefix,
-    daoAddress,
+    daoAddress: daoAddress ? getAddress(daoAddress) : undefined,
   });
 
   useGovernanceContracts();

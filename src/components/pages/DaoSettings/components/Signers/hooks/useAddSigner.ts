@@ -1,14 +1,13 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getAddress, isHex } from 'viem';
+import { Address, encodeFunctionData } from 'viem';
+import GnosisSafeL2Abi from '../../../../../../assets/abi/GnosisSafeL2';
 import useSubmitProposal from '../../../../../../hooks/DAO/proposal/useSubmitProposal';
-import { useFractal } from '../../../../../../providers/App/AppProvider';
 import { ProposalExecuteData } from '../../../../../../types';
 
 const useAddSigner = () => {
   const { submitProposal } = useSubmitProposal();
   const { t } = useTranslation(['modals']);
-  const { baseContracts } = useFractal();
   const addSigner = useCallback(
     async ({
       newSigner,
@@ -17,29 +16,27 @@ const useAddSigner = () => {
       daoAddress,
       close,
     }: {
-      newSigner: string;
+      newSigner: Address;
       threshold: number;
       nonce: number;
-      daoAddress: string | null;
+      daoAddress: Address | null;
       close: () => void;
     }) => {
-      if (!baseContracts || !daoAddress) {
+      if (!daoAddress) {
         return;
       }
-      const { safeSingletonContract } = baseContracts;
       const description = 'Add Signer';
 
-      const encodedAddOwner = safeSingletonContract.asSigner.interface.encodeFunctionData(
-        'addOwnerWithThreshold',
-        [newSigner, BigInt(threshold)],
-      );
-      if (!isHex(encodedAddOwner)) {
-        return;
-      }
+      const encodedAddOwner = encodeFunctionData({
+        abi: GnosisSafeL2Abi,
+        functionName: 'addOwnerWithThreshold',
+        args: [newSigner, BigInt(threshold)],
+      });
+
       const calldatas = [encodedAddOwner];
 
       const proposalData: ProposalExecuteData = {
-        targets: [getAddress(daoAddress)],
+        targets: [daoAddress],
         values: [0n],
         calldatas,
         metaData: {
@@ -58,7 +55,7 @@ const useAddSigner = () => {
         failedToastMessage: t('addSignerFailureToastMessage'),
       });
     },
-    [baseContracts, submitProposal, t],
+    [submitProposal, t],
   );
 
   return addSigner;

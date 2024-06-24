@@ -1,4 +1,5 @@
 import { SafeInfoResponse, TransferResponse } from '@safe-global/safe-service-client';
+import { Address } from 'viem';
 
 export declare enum Operation {
   CALL = 0,
@@ -29,7 +30,8 @@ export declare type DataDecoded = {
 
 export type SafeInfoResponseWithGuard = SafeInfoResponse & {
   nextNonce: number;
-  guard?: string;
+  guard?: Address;
+  address: Address;
 };
 
 /**

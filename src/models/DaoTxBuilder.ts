@@ -1,12 +1,11 @@
-import { ethers } from 'ethers';
-import { zeroAddress } from 'viem';
-import { GnosisSafeL2 } from '../assets/typechain-types/usul/@gnosis.pm/safe-contracts/contracts';
+import { abis } from '@fractal-framework/fractal-contracts';
+import { Address, PublicClient, encodeFunctionData, zeroAddress } from 'viem';
+import GnosisSafeL2Abi from '../assets/abi/GnosisSafeL2';
+import MultiSendCallOnlyAbi from '../assets/abi/MultiSendCallOnly';
 import { buildContractCall, encodeMultiSend } from '../helpers';
 import {
-  BaseContracts,
   SafeMultisigDAO,
   SafeTransaction,
-  AzoriusContracts,
   AzoriusERC20DAO,
   AzoriusERC721DAO,
   VotingStrategyType,
@@ -22,9 +21,9 @@ export class DaoTxBuilder extends BaseTxBuilder {
 
   // Safe Data
   private readonly createSafeTx: SafeTransaction;
-  private readonly safeContract: GnosisSafeL2;
+  private readonly safeContractAddress: Address;
   private readonly parentStrategyType?: VotingStrategyType;
-  private readonly parentStrategyAddress?: string;
+  private readonly parentStrategyAddress?: Address;
 
   // Fractal Module Txs
   private enableFractalModuleTx: SafeTransaction | undefined;
@@ -32,33 +31,47 @@ export class DaoTxBuilder extends BaseTxBuilder {
 
   private internalTxs: SafeTransaction[] = [];
 
+  private readonly keyValuePairs: Address;
+  private readonly fractalRegistry: Address;
+  private readonly zodiacModuleProxyFactory: Address;
+  private readonly multiSendCallOnly: Address;
+  private readonly moduleFractalMasterCopy: Address;
+
   constructor(
-    signerOrProvider: ethers.Signer | any,
-    baseContracts: BaseContracts,
-    azoriusContracts: AzoriusContracts | undefined,
+    publicClient: PublicClient,
+    isAzorius: boolean,
     daoData: SafeMultisigDAO | AzoriusERC20DAO | AzoriusERC721DAO,
     saltNum: bigint,
+
     createSafeTx: SafeTransaction,
-    safeContract: GnosisSafeL2,
+    safeContractAddress: Address,
     txBuilderFactory: TxBuilderFactory,
-    parentAddress?: string,
-    parentTokenAddress?: string,
+
+    keyValuePairs: Address,
+    fractalRegistry: Address,
+    zodiacModuleProxyFactory: Address,
+    multiSendCallOnly: Address,
+    moduleFractalMasterCopy: Address,
+
+    parentAddress?: Address,
+    parentTokenAddress?: Address,
+
     parentStrategyType?: VotingStrategyType,
-    parentStrategyAddress?: string,
+    parentStrategyAddress?: Address,
   ) {
-    super(
-      signerOrProvider,
-      baseContracts,
-      azoriusContracts,
-      daoData,
-      parentAddress,
-      parentTokenAddress,
-    );
+    super(publicClient, isAzorius, daoData, parentAddress, parentTokenAddress);
+    this.saltNum = saltNum;
 
     this.createSafeTx = createSafeTx;
-    this.safeContract = safeContract;
+    this.safeContractAddress = safeContractAddress;
     this.txBuilderFactory = txBuilderFactory;
-    this.saltNum = saltNum;
+
+    this.keyValuePairs = keyValuePairs;
+    this.fractalRegistry = fractalRegistry;
+    this.zodiacModuleProxyFactory = zodiacModuleProxyFactory;
+    this.multiSendCallOnly = multiSendCallOnly;
+    this.moduleFractalMasterCopy = moduleFractalMasterCopy;
+
     this.parentStrategyType = parentStrategyType;
     this.parentStrategyAddress = parentStrategyAddress;
 
@@ -92,9 +105,8 @@ export class DaoTxBuilder extends BaseTxBuilder {
 
     if (this.parentAddress) {
       const freezeGuardTxBuilder = this.txBuilderFactory.createFreezeGuardTxBuilder(
-        azoriusTxBuilder.azoriusContract!.address,
-        azoriusTxBuilder.linearVotingContract?.address ??
-          azoriusTxBuilder.linearERC721VotingContract?.address,
+        azoriusTxBuilder.azoriusAddress,
+        azoriusTxBuilder.linearERC20VotingAddress ?? azoriusTxBuilder.linearERC721VotingAddress,
         this.parentStrategyType,
         this.parentStrategyAddress,
       );
@@ -105,7 +117,7 @@ export class DaoTxBuilder extends BaseTxBuilder {
         freezeGuardTxBuilder.buildDeployZodiacModuleTx(),
         freezeGuardTxBuilder.buildFreezeVotingSetupTx(),
         freezeGuardTxBuilder.buildDeployFreezeGuardTx(),
-        freezeGuardTxBuilder.buildSetGuardTx(azoriusTxBuilder.azoriusContract!),
+        freezeGuardTxBuilder.buildSetGuardTx(abis.Azorius, azoriusTxBuilder.azoriusAddress!),
       ]);
     }
     const data = this.daoData as AzoriusERC20DAO;
@@ -131,9 +143,13 @@ export class DaoTxBuilder extends BaseTxBuilder {
     // If subDAO and parentAllocation, deploy claim module
     let tokenClaimTx: SafeTransaction | undefined;
     const parentAllocation = (this.daoData as AzoriusERC20DAO).parentAllocationAmount;
+
     if (this.parentTokenAddress && parentAllocation && parentAllocation !== 0n) {
-      tokenClaimTx = azoriusTxBuilder.buildDeployTokenClaim();
       const tokenApprovalTx = azoriusTxBuilder.buildApproveClaimAllocation();
+      if (!tokenApprovalTx) {
+        throw new Error('buildApproveClaimAllocation returned undefined');
+      }
+      tokenClaimTx = azoriusTxBuilder.buildDeployTokenClaim();
       this.internalTxs.push(tokenApprovalTx);
     }
 
@@ -173,7 +189,7 @@ export class DaoTxBuilder extends BaseTxBuilder {
         freezeGuardTxBuilder.buildDeployZodiacModuleTx(),
         freezeGuardTxBuilder.buildFreezeVotingSetupTx(),
         freezeGuardTxBuilder.buildDeployFreezeGuardTx(),
-        freezeGuardTxBuilder.buildSetGuardTx(this.safeContract),
+        freezeGuardTxBuilder.buildSetGuardTxSafe(this.safeContractAddress),
       ]);
     }
 
@@ -199,9 +215,9 @@ export class DaoTxBuilder extends BaseTxBuilder {
 
   private setFractalModuleTxs(): void {
     const { enableFractalModuleTx, deployFractalModuleTx }: FractalModuleData = fractalModuleData(
-      this.baseContracts.fractalModuleMasterCopyContract,
-      this.baseContracts.zodiacModuleProxyFactoryContract,
-      this.safeContract!,
+      this.moduleFractalMasterCopy,
+      this.zodiacModuleProxyFactory,
+      this.safeContractAddress,
       this.saltNum,
       this.parentAddress,
     );
@@ -216,7 +232,8 @@ export class DaoTxBuilder extends BaseTxBuilder {
 
   private buildUpdateDAONameTx(): SafeTransaction {
     return buildContractCall(
-      this.baseContracts.fractalRegistryContract,
+      abis.FractalRegistry,
+      this.fractalRegistry,
       'updateDAOName',
       [this.daoData.daoName],
       0,
@@ -226,7 +243,8 @@ export class DaoTxBuilder extends BaseTxBuilder {
 
   private buildUpdateDAOSnapshotENSTx(): SafeTransaction {
     return buildContractCall(
-      this.baseContracts.keyValuePairsContract,
+      abis.KeyValuePairs,
+      this.keyValuePairs,
       'updateValues',
       [['snapshotENS'], [this.daoData.snapshotENS]],
       0,
@@ -237,14 +255,17 @@ export class DaoTxBuilder extends BaseTxBuilder {
   private buildExecInternalSafeTx(signatures: string): SafeTransaction {
     const safeInternalTx = encodeMultiSend(this.internalTxs);
     return buildContractCall(
-      this.safeContract!,
+      GnosisSafeL2Abi,
+      this.safeContractAddress,
       'execTransaction',
       [
-        this.baseContracts.multiSendContract.address, // to
+        this.multiSendCallOnly, // to
         '0', // value
-        this.baseContracts.multiSendContract.interface.encodeFunctionData('multiSend', [
-          safeInternalTx,
-        ]), // calldata
+        encodeFunctionData({
+          abi: MultiSendCallOnlyAbi,
+          functionName: 'multiSend',
+          args: [safeInternalTx],
+        }), // calldata
         '1', // operation
         '0', // tx gas
         '0', // base gas

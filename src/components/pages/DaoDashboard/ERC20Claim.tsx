@@ -1,6 +1,9 @@
 import { Alert, AlertTitle, Button, Flex, Text } from '@chakra-ui/react';
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getContract } from 'viem';
+import { usePublicClient, useWalletClient } from 'wagmi';
 import { Alert as AlertIcon } from '../../../assets/theme/custom/icons/Alert';
 import { useTransaction } from '../../../hooks/utils/useTransaction';
 import { useFractal } from '../../../providers/App/AppProvider';
@@ -14,25 +17,32 @@ export function ERCO20Claim() {
     readOnly: { user },
   } = useFractal();
   const account = user.address;
-  const { tokenClaimContract, type } = governance;
+  const { tokenClaimContractAddress, type } = governance;
   const { t } = useTranslation(['dashboard', 'transaction']);
   const [contractCall, pending] = useTransaction();
   const azoriusGovernance = governance as AzoriusGovernance;
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
 
   const loadClaim = useCallback(async () => {
-    if (!tokenClaimContract || !type || !account) {
+    if (!tokenClaimContractAddress || !type || !account || !publicClient) {
       return;
     }
-    const claimableAmount = (await tokenClaimContract.getClaimAmount(account)).toBigInt();
+    const tokenClaimContract = getContract({
+      abi: abis.ERC20Claim,
+      address: tokenClaimContractAddress,
+      client: publicClient,
+    });
+    const claimableAmount = await tokenClaimContract.read.getClaimAmount([account]);
     setUserClaimable(claimableAmount);
-  }, [tokenClaimContract, type, account]);
+  }, [account, publicClient, tokenClaimContractAddress, type]);
 
   useEffect(() => {
     loadClaim();
   }, [loadClaim]);
 
   const claimToken = async () => {
-    if (!tokenClaimContract || !azoriusGovernance.votesToken || !account) {
+    if (!tokenClaimContractAddress || !azoriusGovernance.votesToken || !account || !walletClient) {
       return;
     }
     const claimableString = formatCoin(
@@ -41,8 +51,13 @@ export function ERCO20Claim() {
       azoriusGovernance.votesToken.decimals,
       azoriusGovernance.votesToken.symbol,
     );
+    const tokenClaimContract = getContract({
+      abi: abis.ERC20Claim,
+      address: tokenClaimContractAddress,
+      client: walletClient,
+    });
     contractCall({
-      contractFn: () => tokenClaimContract.claimTokens(account),
+      contractFn: () => tokenClaimContract.write.claimTokens([account]),
       pendingMessage: t('pendingTokenClaim', {
         symbol: azoriusGovernance.votesToken.symbol,
         ns: 'transaction',

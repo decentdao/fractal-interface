@@ -1,7 +1,7 @@
 import { getSTETHContract, getWithdrawalQueueContract } from '@lido-sdk/contracts';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isHex, getAddress } from 'viem';
+import { isHex } from 'viem';
 import { useFractal } from '../../../providers/App/AppProvider';
 import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
 import { ProposalExecuteData } from '../../../types';
@@ -40,7 +40,7 @@ export default function useLidoStaking() {
           description: t('stakeWithLidoDescription'),
           documentationUrl: 'https://docs.lido.fi/guides/steth-integration-guide#what-is-steth',
         },
-        targets: [getAddress(lido.stETHContractAddress)],
+        targets: [lido.stETHContractAddress],
         calldatas: [encodedSubmit],
         values: [value],
       };
@@ -90,10 +90,7 @@ export default function useLidoStaking() {
           documentationUrl:
             'https://docs.lido.fi/guides/steth-integration-guide#request-withdrawal-and-mint-nft',
         },
-        targets: [
-          getAddress(lido.stETHContractAddress),
-          getAddress(lido.withdrawalQueueContractAddress),
-        ],
+        targets: [lido.stETHContractAddress, lido.withdrawalQueueContractAddress],
         calldatas: [encodedApprove, encodedWithdraw],
         values: [0n, 0n],
       };
@@ -132,7 +129,7 @@ export default function useLidoStaking() {
           description: t('lidoWithdrawalDescription'),
           documentationUrl: 'https://docs.lido.fi/guides/steth-integration-guide#claiming',
         },
-        targets: [getAddress(lido.withdrawalQueueContractAddress)],
+        targets: [lido.withdrawalQueueContractAddress],
         calldatas: [encodedClaim],
         values: [0n],
       };

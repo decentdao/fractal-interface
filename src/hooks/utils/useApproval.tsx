@@ -1,25 +1,34 @@
-import { VotesERC20, VotesERC20Wrapper } from '@fractal-framework/fractal-contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { abis } from '@fractal-framework/fractal-contracts';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { maxUint256 } from 'viem';
-import { useAccount } from 'wagmi';
+import { Address, getContract, maxUint256 } from 'viem';
+import { useAccount, useWalletClient } from 'wagmi';
 import { useTransaction } from './useTransaction';
 
-const useApproval = (
-  tokenContract?: VotesERC20 | VotesERC20Wrapper,
-  spenderAddress?: string,
-  userBalance?: bigint,
-) => {
+const useApproval = (tokenAddress?: Address, spenderAddress?: Address, userBalance?: bigint) => {
   const { address: account } = useAccount();
   const [allowance, setAllowance] = useState(0n);
   const [approved, setApproved] = useState(false);
   const [contractCall, pending] = useTransaction();
   const { t } = useTranslation('treasury');
+  const { data: walletClient } = useWalletClient();
+
+  const tokenContract = useMemo(() => {
+    if (!walletClient || !tokenAddress) {
+      return;
+    }
+
+    return getContract({
+      abi: abis.VotesERC20,
+      address: tokenAddress,
+      client: walletClient,
+    });
+  }, [tokenAddress, walletClient]);
 
   const fetchAllowance = useCallback(async () => {
-    if (!tokenContract || !account || !spenderAddress) return;
+    if (!account || !spenderAddress || !tokenContract) return;
 
-    const userAllowance = (await tokenContract.allowance(account, spenderAddress)).toBigInt();
+    const userAllowance = await tokenContract.read.allowance([account, spenderAddress]);
     setAllowance(userAllowance);
   }, [account, tokenContract, spenderAddress]);
 
@@ -27,7 +36,7 @@ const useApproval = (
     if (!tokenContract || !account || !spenderAddress) return;
 
     contractCall({
-      contractFn: () => tokenContract.approve(spenderAddress, maxUint256),
+      contractFn: () => tokenContract.write.approve([spenderAddress, maxUint256]),
       pendingMessage: t('approvalPendingMessage'),
       failedMessage: t('approvalFailedMessage'),
       successMessage: t('approvalSuccessMessage'),

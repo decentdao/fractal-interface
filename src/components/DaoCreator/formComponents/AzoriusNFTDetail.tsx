@@ -1,7 +1,7 @@
 import { Flex, Box, Text } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { erc721Abi, getContract, isAddress } from 'viem';
+import { Address, erc721Abi, getContract, isAddress } from 'viem';
 import { usePublicClient, useWalletClient } from 'wagmi';
 import useDisplayName from '../../../hooks/utils/useDisplayName';
 import { BigIntValuePair, ERC721TokenConfig } from '../../../types';
@@ -10,7 +10,7 @@ import { BarLoader } from '../../ui/loaders/BarLoader';
 type TokenDetails = {
   name: string;
   symbol: string;
-  address: string;
+  address: Address;
 };
 
 export default function AzoriusNFTDetail({

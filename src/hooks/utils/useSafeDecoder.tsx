@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useCallback } from 'react';
-import { encodePacked, keccak256 } from 'viem';
+import { Address, encodePacked, keccak256 } from 'viem';
 import { useNetworkConfig } from '../../providers/NetworkConfig/NetworkConfigProvider';
 import { DecodedTransaction, DecodedTxParam } from '../../types';
 import { buildSafeApiUrl, parseMultiSendTransactions } from '../../utils';
@@ -13,7 +13,7 @@ export const useSafeDecoder = () => {
   const { safeBaseURL } = useNetworkConfig();
   const [setValue, getValue] = useIndexedDB(DBObjectKeys.DECODED_TRANSACTIONS);
   const decode = useCallback(
-    async (value: string, to: string, data?: string): Promise<DecodedTransaction[]> => {
+    async (value: string, to: Address, data?: string): Promise<DecodedTransaction[]> => {
       if (!data || data.length <= 2) {
         // a transaction without data is an Eth transfer
         return [

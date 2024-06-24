@@ -12,7 +12,7 @@
     "@ethersproject/abstract-signer": "^5.7.0",
     "@ethersproject/providers": "^5.7.2",
     "@fontsource/space-mono": "^5.0.19",
-    "@fractal-framework/fractal-contracts": "^0.7.1",
+    "@fractal-framework/fractal-contracts": "^1.1.4",
     "@graphprotocol/client-apollo": "^1.0.16",
     "@lido-sdk/contracts": "^3.0.2",
     "@netlify/blobs": "^6.5.0",

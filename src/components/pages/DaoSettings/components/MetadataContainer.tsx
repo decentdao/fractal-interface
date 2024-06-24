@@ -1,8 +1,9 @@
 import { Button } from '@chakra-ui/react';
+import { abis } from '@fractal-framework/fractal-contracts';
 import { useState, useEffect, ChangeEventHandler } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { isHex, getAddress } from 'viem';
+import { encodeFunctionData } from 'viem';
 import { DAO_ROUTES } from '../../../../constants/routes';
 import useSubmitProposal from '../../../../hooks/DAO/proposal/useSubmitProposal';
 import { useCanUserCreateProposal } from '../../../../hooks/utils/useCanUserSubmitProposal';
@@ -24,13 +25,15 @@ export function MetadataContainer() {
   const { submitProposal } = useSubmitProposal();
   const { canUserCreateProposal } = useCanUserCreateProposal();
   const {
-    baseContracts,
     node: { daoName, daoSnapshotENS, daoAddress, safe },
     readOnly: {
       user: { votingWeight },
     },
   } = useFractal();
-  const { addressPrefix } = useNetworkConfig();
+  const {
+    addressPrefix,
+    contracts: { keyValuePairs, fractalRegistry },
+  } = useNetworkConfig();
 
   useEffect(() => {
     if (daoName && daoAddress && createAccountSubstring(daoAddress) !== daoName) {
@@ -60,24 +63,19 @@ export function MetadataContainer() {
   };
 
   const handleEditDAOName = () => {
-    if (!baseContracts) {
-      return;
-    }
-    const { fractalRegistryContract } = baseContracts;
-    const encodedUpdateDAOName = fractalRegistryContract.asProvider.interface.encodeFunctionData(
-      'updateDAOName',
-      [name],
-    );
-    if (!isHex(encodedUpdateDAOName)) {
-      return;
-    }
+    const encodedUpdateDAOName = encodeFunctionData({
+      abi: abis.FractalRegistry,
+      functionName: 'updateDAOName',
+      args: [name],
+    });
+
     const proposalData: ProposalExecuteData = {
       metaData: {
         title: t('updatesSafeName', { ns: 'proposalMetadata' }),
         description: '',
         documentationUrl: '',
       },
-      targets: [getAddress(fractalRegistryContract.asProvider.address)],
+      targets: [fractalRegistry],
       values: [0n],
       calldatas: [encodedUpdateDAOName],
     };
@@ -93,24 +91,19 @@ export function MetadataContainer() {
   };
 
   const handleEditDAOSnapshotENS = () => {
-    if (!baseContracts) {
-      return;
-    }
-    const { keyValuePairsContract } = baseContracts;
-    const encodedUpdateValues = keyValuePairsContract.asProvider.interface.encodeFunctionData(
-      'updateValues',
-      [['snapshotENS'], [snapshotENS]],
-    );
-    if (!isHex(encodedUpdateValues)) {
-      return;
-    }
+    const encodedUpdateValues = encodeFunctionData({
+      abi: abis.KeyValuePairs,
+      functionName: 'updateValues',
+      args: [['snapshotENS'], [snapshotENS]],
+    });
+
     const proposalData: ProposalExecuteData = {
       metaData: {
         title: t('updateSnapshotSpace', { ns: 'proposalMetadata' }),
         description: '',
         documentationUrl: '',
       },
-      targets: [getAddress(keyValuePairsContract.asProvider.address)],
+      targets: [keyValuePairs],
       values: [0n],
       calldatas: [encodedUpdateValues],
     };

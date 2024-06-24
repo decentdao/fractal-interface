@@ -1,159 +1,183 @@
-import { DelegateChangedEvent } from '@fractal-framework/fractal-contracts/dist/typechain-types/contracts/VotesERC20';
-import { useCallback, useEffect, useRef } from 'react';
-import { getAddress } from 'viem';
+import { abis } from '@fractal-framework/fractal-contracts';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { getContract } from 'viem';
+import { usePublicClient } from 'wagmi';
 import { useFractal } from '../../../../providers/App/AppProvider';
 import { FractalGovernanceAction } from '../../../../providers/App/governance/action';
-import useSafeContracts from '../../../safe/useSafeContracts';
 
 export const useERC20LinearToken = ({ onMount = true }: { onMount?: boolean }) => {
   const isTokenLoaded = useRef(false);
   const tokenAccount = useRef<string>();
 
   const {
-    governanceContracts: { votesTokenContractAddress, underlyingTokenAddress },
+    governanceContracts: { votesTokenAddress, underlyingTokenAddress },
     action,
     readOnly: { user },
   } = useFractal();
   const account = user.address;
-  const baseContracts = useSafeContracts();
+  const publicClient = usePublicClient();
 
-  const loadERC20Token = useCallback(async () => {
-    if (!votesTokenContractAddress || !baseContracts) {
+  const tokenContract = useMemo(() => {
+    if (!votesTokenAddress || !publicClient) {
       return;
     }
-    const tokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(votesTokenContractAddress);
+
+    return getContract({
+      abi: abis.VotesERC20,
+      address: votesTokenAddress,
+      client: publicClient,
+    });
+  }, [publicClient, votesTokenAddress]);
+
+  const underlyingTokenContract = useMemo(() => {
+    if (!underlyingTokenAddress || !publicClient) {
+      return;
+    }
+
+    return getContract({
+      abi: abis.VotesERC20,
+      address: underlyingTokenAddress,
+      client: publicClient,
+    });
+  }, [publicClient, underlyingTokenAddress]);
+
+  const loadERC20Token = useCallback(async () => {
+    if (!tokenContract) {
+      return;
+    }
+
     const [tokenName, tokenSymbol, tokenDecimals, totalSupply] = await Promise.all([
-      tokenContract.name(),
-      tokenContract.symbol(),
-      tokenContract.decimals(),
-      (await tokenContract.totalSupply()).toBigInt(),
+      tokenContract.read.name(),
+      tokenContract.read.symbol(),
+      tokenContract.read.decimals(),
+      await tokenContract.read.totalSupply(),
     ]);
     const tokenData = {
       name: tokenName,
       symbol: tokenSymbol,
       decimals: tokenDecimals,
-      address: getAddress(votesTokenContractAddress),
+      address: tokenContract.address,
       totalSupply,
     };
     isTokenLoaded.current = true;
     action.dispatch({ type: FractalGovernanceAction.SET_TOKEN_DATA, payload: tokenData });
-  }, [votesTokenContractAddress, action, baseContracts]);
+  }, [tokenContract, action]);
 
   const loadUnderlyingERC20Token = useCallback(async () => {
-    if (!underlyingTokenAddress || !baseContracts) {
+    if (!underlyingTokenContract) {
       return;
     }
-    const tokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(underlyingTokenAddress);
 
     const [tokenName, tokenSymbol] = await Promise.all([
-      tokenContract.name(),
-      tokenContract.symbol(),
+      underlyingTokenContract.read.name(),
+      underlyingTokenContract.read.symbol(),
     ]);
     const tokenData = {
       name: tokenName,
       symbol: tokenSymbol,
-      address: getAddress(underlyingTokenAddress),
+      address: underlyingTokenContract.address,
     };
     action.dispatch({
       type: FractalGovernanceAction.SET_UNDERLYING_TOKEN_DATA,
       payload: tokenData,
     });
-  }, [underlyingTokenAddress, action, baseContracts]);
+  }, [underlyingTokenContract, action]);
 
   const loadERC20TokenAccountData = useCallback(async () => {
-    if (!votesTokenContractAddress || !account || !baseContracts) {
+    if (!account || !tokenContract) {
       action.dispatch({ type: FractalGovernanceAction.RESET_TOKEN_ACCOUNT_DATA });
       return;
     }
-    const tokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(votesTokenContractAddress);
-    // @todo We could probably save on some requests here.
-    const [tokenBalance, tokenDelegatee, tokenVotingWeight] = await Promise.all([
-      (await tokenContract.balanceOf(account)).toBigInt(),
-      tokenContract.delegates(account),
-      (await tokenContract.getVotes(account)).toBigInt(),
-    ]);
 
-    let delegateChangeEvents: DelegateChangedEvent[];
-    try {
-      delegateChangeEvents = await tokenContract.queryFilter(
-        tokenContract.filters.DelegateChanged(),
-      );
-    } catch (e) {
-      delegateChangeEvents = [];
-    }
+    const [tokenBalance, tokenDelegatee, tokenVotingWeight] = await Promise.all([
+      tokenContract.read.balanceOf([account]),
+      tokenContract.read.delegates([account]),
+      tokenContract.read.getVotes([account]),
+    ]);
 
     const tokenAccountData = {
       balance: tokenBalance,
       delegatee: tokenDelegatee,
       votingWeight: tokenVotingWeight,
-      isDelegatesSet: delegateChangeEvents.length > 0,
     };
 
     action.dispatch({
       type: FractalGovernanceAction.SET_TOKEN_ACCOUNT_DATA,
       payload: tokenAccountData,
     });
-  }, [votesTokenContractAddress, action, account, baseContracts]);
+  }, [account, tokenContract, action]);
 
   useEffect(() => {
     if (
-      votesTokenContractAddress &&
+      votesTokenAddress &&
       isTokenLoaded.current &&
-      tokenAccount.current !== account + votesTokenContractAddress &&
+      tokenAccount.current !== account + votesTokenAddress &&
       onMount
     ) {
-      tokenAccount.current = account + votesTokenContractAddress;
+      tokenAccount.current = account + votesTokenAddress;
       loadERC20TokenAccountData();
     }
-  }, [account, votesTokenContractAddress, onMount, loadERC20TokenAccountData]);
+  }, [account, votesTokenAddress, onMount, loadERC20TokenAccountData]);
 
   useEffect(() => {
-    if (!votesTokenContractAddress || !onMount || !baseContracts) {
+    if (!onMount || !tokenContract || !account) {
       return;
     }
-    const tokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(votesTokenContractAddress);
 
-    const delegateVotesChangedfilter = tokenContract.filters.DelegateVotesChanged();
-    tokenContract.on(delegateVotesChangedfilter, loadERC20TokenAccountData);
+    const unwatch = tokenContract.watchEvent.DelegateVotesChanged(
+      { delegate: account },
+      { onLogs: loadERC20TokenAccountData },
+    );
 
     return () => {
-      tokenContract.off(delegateVotesChangedfilter, loadERC20TokenAccountData);
+      unwatch();
     };
-  }, [votesTokenContractAddress, loadERC20TokenAccountData, onMount, baseContracts]);
+  }, [loadERC20TokenAccountData, onMount, tokenContract, account]);
 
   useEffect(() => {
-    if (!votesTokenContractAddress || !onMount || !baseContracts) {
+    if (!tokenContract || !onMount || !account) {
       return;
     }
-    const tokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(votesTokenContractAddress);
-    const delegateChangedfilter = tokenContract.filters.DelegateChanged();
-    tokenContract.on(delegateChangedfilter, loadERC20TokenAccountData);
+
+    const unwatchDelegator = tokenContract.watchEvent.DelegateChanged(
+      { delegator: account },
+      { onLogs: loadERC20TokenAccountData },
+    );
+    const unwatchFromDelegate = tokenContract.watchEvent.DelegateChanged(
+      { fromDelegate: account },
+      { onLogs: loadERC20TokenAccountData },
+    );
+    const unwatchToDelegate = tokenContract.watchEvent.DelegateChanged(
+      { toDelegate: account },
+      { onLogs: loadERC20TokenAccountData },
+    );
 
     return () => {
-      tokenContract.off(delegateChangedfilter, loadERC20TokenAccountData);
+      unwatchDelegator();
+      unwatchFromDelegate();
+      unwatchToDelegate();
     };
-  }, [votesTokenContractAddress, loadERC20TokenAccountData, onMount, baseContracts]);
+  }, [account, loadERC20TokenAccountData, onMount, tokenContract]);
 
   useEffect(() => {
-    if (!votesTokenContractAddress || !onMount || !baseContracts) {
+    if (!onMount || !account || !tokenContract) {
       return;
     }
-    const tokenContract =
-      baseContracts.votesTokenMasterCopyContract.asProvider.attach(votesTokenContractAddress);
-    const filterTo = tokenContract.filters.Transfer(null, account);
-    const filterFrom = tokenContract.filters.Transfer(account, null);
-    tokenContract.on(filterTo, loadERC20TokenAccountData);
-    tokenContract.on(filterFrom, loadERC20TokenAccountData);
+
+    const unwatchTo = tokenContract.watchEvent.Transfer(
+      { from: account },
+      { onLogs: loadERC20TokenAccountData },
+    );
+    const unwatchFrom = tokenContract.watchEvent.Transfer(
+      { to: account },
+      { onLogs: loadERC20TokenAccountData },
+    );
+
     return () => {
-      tokenContract.off(filterTo, loadERC20TokenAccountData);
-      tokenContract.off(filterFrom, loadERC20TokenAccountData);
+      unwatchTo();
+      unwatchFrom();
     };
-  }, [votesTokenContractAddress, account, onMount, loadERC20TokenAccountData, baseContracts]);
+  }, [account, loadERC20TokenAccountData, onMount, tokenContract]);
 
   return { loadERC20Token, loadUnderlyingERC20Token, loadERC20TokenAccountData };
 };

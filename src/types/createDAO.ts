@@ -74,11 +74,11 @@ export type DAOEssentials = {
 
 export type DAOGovernorERC20Token<T = bigint> = {
   tokenCreationType: TokenCreationType;
-  tokenImportAddress?: string;
+  tokenImportAddress?: Address;
   tokenName: string;
   tokenSymbol: string;
   tokenSupply: T;
-  tokenAllocations: TokenAllocation<T>[];
+  tokenAllocations: { amount: T; address: string }[];
   parentAllocationAmount: T;
 };
 
@@ -109,7 +109,7 @@ export type DAOFreezeGuardConfig<T = bigint> = {
 };
 
 export interface SafeConfiguration {
-  trustedAddresses: string[];
+  trustedAddresses: Address[];
   signatureThreshold: number;
   numOfSigners?: number;
   customNonce: number;

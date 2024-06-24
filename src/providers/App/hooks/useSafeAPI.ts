@@ -22,6 +22,7 @@ import SafeServiceClient, {
 } from '@safe-global/safe-service-client';
 import { ethers } from 'ethers';
 import { useMemo } from 'react';
+import { Address, getAddress } from 'viem';
 import { CacheExpiry } from '../../../hooks/utils/cache/cacheDefaults';
 import {
   DBObjectKeys,
@@ -90,7 +91,7 @@ class CachingSafeServiceClient extends SafeServiceClient {
     });
     return value;
   }
-  override async getSafesByOwner(ownerAddress: string): Promise<OwnerResponse> {
+  override async getSafesByOwner(ownerAddress: Address): Promise<OwnerResponse> {
     const value = await this.request('getSafesByOwner' + ownerAddress, 1, () => {
       return super.getSafesByOwner(ownerAddress);
     });
@@ -102,32 +103,32 @@ class CachingSafeServiceClient extends SafeServiceClient {
     });
     return value;
   }
-  override async getSafeInfo(safeAddress: string): Promise<SafeInfoResponse> {
+  override async getSafeInfo(safeAddress: Address): Promise<SafeInfoResponse> {
     const value = await this.request('getSafeInfo' + safeAddress, 5, () => {
       return super.getSafeInfo(safeAddress);
     });
     return value;
   }
-  override async getSafeDelegates(safeAddress: string): Promise<SafeDelegateListResponse> {
+  override async getSafeDelegates(safeAddress: Address): Promise<SafeDelegateListResponse> {
     const value = await this.request('getSafeDelegates' + safeAddress, 1, () => {
       return super.getSafeDelegates(safeAddress);
     });
     return value;
   }
-  override async getSafeCreationInfo(safeAddress: string): Promise<SafeCreationInfoResponse> {
+  override async getSafeCreationInfo(safeAddress: Address): Promise<SafeCreationInfoResponse> {
     const value = await this.request('getSafeCreationInfo' + safeAddress, CacheExpiry.NEVER, () => {
       return super.getSafeCreationInfo(safeAddress);
     });
     return value;
   }
-  override async getIncomingTransactions(safeAddress: string): Promise<TransferListResponse> {
+  override async getIncomingTransactions(safeAddress: Address): Promise<TransferListResponse> {
     const value = await this.request('getIncomingTransactions' + safeAddress, 1, () => {
       return super.getIncomingTransactions(safeAddress);
     });
     return value;
   }
   override async getModuleTransactions(
-    safeAddress: string,
+    safeAddress: Address,
   ): Promise<SafeModuleTransactionListResponse> {
     const value = await this.request('getModuleTransactions' + safeAddress, 1, () => {
       return super.getModuleTransactions(safeAddress);
@@ -135,7 +136,7 @@ class CachingSafeServiceClient extends SafeServiceClient {
     return value;
   }
   override async getMultisigTransactions(
-    safeAddress: string,
+    safeAddress: Address,
   ): Promise<SafeMultisigTransactionListResponse> {
     const value = await this.request('getMultisigTransactions' + safeAddress, 1, () => {
       return super.getMultisigTransactions(safeAddress);
@@ -143,7 +144,7 @@ class CachingSafeServiceClient extends SafeServiceClient {
     return value;
   }
   override async getPendingTransactions(
-    safeAddress: string,
+    safeAddress: Address,
     currentNonce?: number | undefined,
   ): Promise<SafeMultisigTransactionListResponse> {
     const value = await this.request(
@@ -156,7 +157,7 @@ class CachingSafeServiceClient extends SafeServiceClient {
     return value;
   }
   override async getBalances(
-    safeAddress: string,
+    safeAddress: Address,
     options?: SafeBalancesOptions | undefined,
   ): Promise<SafeBalanceResponse[]> {
     const value = await this.request('getBalances' + safeAddress + options?.toString(), 1, () => {
@@ -165,7 +166,7 @@ class CachingSafeServiceClient extends SafeServiceClient {
     return value;
   }
   override async getCollectibles(
-    safeAddress: string,
+    safeAddress: Address,
     options?: SafeCollectiblesOptions | undefined,
   ): Promise<SafeCollectibleResponse[]> {
     const value = await this.request(
@@ -190,7 +191,7 @@ class CachingSafeServiceClient extends SafeServiceClient {
     return value;
   }
   override async getAllTransactions(
-    safeAddress: string,
+    safeAddress: Address,
     options?: AllTransactionsOptions,
   ): Promise<AllTransactionsListResponse> {
     const value = await this.request(
@@ -202,17 +203,21 @@ class CachingSafeServiceClient extends SafeServiceClient {
     );
     return value;
   }
-  override async getSafesByModule(moduleAddress: string): Promise<ModulesResponse> {
+  override async getSafesByModule(moduleAddress: Address): Promise<ModulesResponse> {
     const value = await this.request('getSafesByModule' + moduleAddress, 1, () => {
       return super.getSafesByModule(moduleAddress);
     });
     return value;
   }
 
-  async getSafeData(safeAddress: string): Promise<SafeInfoResponseWithGuard> {
+  async getSafeData(safeAddress: Address): Promise<SafeInfoResponseWithGuard> {
     const safeInfoResponse = await this.getSafeInfo(safeAddress);
     const nextNonce = await this.getNextNonce(safeAddress);
-    const safeInfo = { ...safeInfoResponse, nextNonce };
+    const safeInfo = {
+      ...safeInfoResponse,
+      nextNonce,
+      address: getAddress(safeInfoResponse.address),
+    };
     return safeInfo;
   }
 }

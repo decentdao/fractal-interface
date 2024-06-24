@@ -1,45 +1,53 @@
+import { PublicClient } from 'viem';
 import { logError } from '../helpers/errorLogging';
 import { CacheExpiry, CacheKeys } from '../hooks/utils/cache/cacheDefaults';
 import { setValue, getValue } from '../hooks/utils/cache/useLocalStorage';
-import { Providers } from '../types/network';
 
-export const getAverageBlockTime = async (provider: Providers) => {
+export const getAverageBlockTime = async (publicClient: PublicClient) => {
+  if (!publicClient.chain) {
+    return 0;
+  }
+
   let averageBlockTime = getValue({
     cacheName: CacheKeys.AVERAGE_BLOCK_TIME,
-    chainId: provider.network.chainId,
+    chainId: publicClient.chain.id,
   });
+
   if (averageBlockTime) {
     return averageBlockTime;
   }
-  const latestBlock = await provider.getBlock('latest');
-  const pastBlock = await provider.getBlock(latestBlock.number - 1000);
-  averageBlockTime = (latestBlock.timestamp - pastBlock.timestamp) / 1000;
+
+  const latestBlock = await publicClient.getBlock();
+  const pastBlock = await publicClient.getBlock({ blockNumber: latestBlock.number - 1000n });
+  averageBlockTime = Number((latestBlock.timestamp - pastBlock.timestamp) / 1000n);
+
   setValue(
-    { cacheName: CacheKeys.AVERAGE_BLOCK_TIME, chainId: provider.network.chainId },
+    { cacheName: CacheKeys.AVERAGE_BLOCK_TIME, chainId: publicClient.chain.id },
     averageBlockTime,
     CacheExpiry.ONE_DAY,
   );
+
   return averageBlockTime;
 };
 
-export const getTimeStamp = async (blockNumber: number | 'latest', provider: Providers) => {
-  if (!provider || !blockNumber) {
-    return 0;
-  }
+export const getTimeStamp = async (blockNumber: number | 'latest', publicClient: PublicClient) => {
   if (blockNumber === 'latest') {
-    const latestBlock = await provider.getBlock('latest');
-    return latestBlock.timestamp;
+    const latestBlock = await publicClient.getBlock();
+    return Number(latestBlock.timestamp);
   }
+
   try {
-    const block = await provider.getBlock(blockNumber);
-    const latestBlock = await provider.getBlock('latest');
+    const block = await publicClient.getBlock({ blockNumber: BigInt(blockNumber) });
+    const latestBlock = await publicClient.getBlock();
 
     if (blockNumber < latestBlock.number) {
-      return block.timestamp;
+      return Number(block.timestamp);
     } else {
-      const averageBlockTime = await getAverageBlockTime(provider);
-      const estimatedTimestamp =
-        latestBlock.timestamp + averageBlockTime * (blockNumber - latestBlock.number);
+      const averageBlockTime = await getAverageBlockTime(publicClient);
+      const estimatedTimestamp = Number(
+        latestBlock.timestamp +
+          BigInt(averageBlockTime) * (BigInt(blockNumber) - latestBlock.number),
+      );
 
       return estimatedTimestamp;
     }
@@ -51,13 +59,10 @@ export const getTimeStamp = async (blockNumber: number | 'latest', provider: Pro
 
 export const blocksToSeconds = async (
   numOfBlocks: number,
-  provider: Providers,
+  publicClient: PublicClient,
 ): Promise<number> => {
-  if (!provider || !numOfBlocks) {
-    return 0;
-  }
   try {
-    const averageBlockTime = Math.round(await getAverageBlockTime(provider));
+    const averageBlockTime = Math.round(await getAverageBlockTime(publicClient));
     return averageBlockTime * numOfBlocks;
   } catch (error) {
     logError(error);
@@ -67,9 +72,9 @@ export const blocksToSeconds = async (
 
 export const getEstimatedNumberOfBlocks = async (
   timeInMinutes: bigint,
-  provider: Providers,
+  publicClient: PublicClient,
 ): Promise<bigint> => {
   const seconds = Number(timeInMinutes) * 60;
-  const averageBlockTime = await getAverageBlockTime(provider);
+  const averageBlockTime = await getAverageBlockTime(publicClient);
   return BigInt(Math.ceil(seconds / averageBlockTime));
 };

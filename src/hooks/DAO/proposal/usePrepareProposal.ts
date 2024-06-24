@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
 import { Hex, getAddress } from 'viem';
-import { useEthersSigner } from '../../../providers/Ethers/hooks/useEthersSigner';
+import { usePublicClient } from 'wagmi';
 import { CreateProposalForm } from '../../../types/proposalBuilder';
 import { encodeFunction } from '../../../utils/crypto';
 import { validateENSName, isValidUrl } from '../../../utils/url';
 
 export function usePrepareProposal() {
-  const signer = useEthersSigner();
+  const publicClient = usePublicClient();
+
   const prepareProposal = useCallback(
     async (values: CreateProposalForm) => {
       const { transactions, proposalMetadata } = values;
@@ -34,8 +35,11 @@ export function usePrepareProposal() {
       });
       const targets = await Promise.all(
         transactionsWithEncoding.map(async tx => {
-          if (validateENSName(tx.targetAddress) && signer) {
-            return getAddress(await signer.resolveName(tx.targetAddress));
+          if (tx.targetAddress && validateENSName(tx.targetAddress) && publicClient) {
+            const address = await publicClient.getEnsAddress({ name: tx.targetAddress });
+            if (address) {
+              return address;
+            }
           }
           return getAddress(tx.targetAddress);
         }),
@@ -52,7 +56,7 @@ export function usePrepareProposal() {
         },
       };
     },
-    [signer],
+    [publicClient],
   );
   return { prepareProposal };
 }

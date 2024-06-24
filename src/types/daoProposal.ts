@@ -26,7 +26,7 @@ export type ProposalData = {
 };
 
 export interface AzoriusProposal extends GovernanceActivity {
-  proposer: string;
+  proposer: Address;
   votesSummary: ProposalVotesSummary;
   votes: ProposalVote[] | ERC721ProposalVote[];
   /** The deadline timestamp for the proposal, in milliseconds. */
@@ -47,7 +47,7 @@ export interface SnapshotProposal extends GovernanceActivity {
   description: string;
   startTime: number;
   endTime: number;
-  author: string;
+  author: Address;
 }
 
 interface SnapshotVotingStrategy {
@@ -65,7 +65,7 @@ export interface SnapshotWeightedVotingChoice {
 }
 export interface SnapshotVote {
   id: string;
-  voter: string;
+  voter: Address;
   votingWeight: number;
   votingWeightByStrategy: number[];
   votingState: string;
@@ -117,13 +117,13 @@ export type ProposalVotesSummary = {
 };
 
 export type ProposalVote = {
-  voter: string;
+  voter: Address;
   choice: (typeof VOTE_CHOICES)[number];
   weight: bigint;
 };
 
 export type ERC721ProposalVote = {
-  tokenAddresses: string[];
+  tokenAddresses: Address[];
   tokenIds: string[];
 } & ProposalVote;
 

@@ -1,6 +1,7 @@
 import { Box, Button, Flex, Icon, IconButton, Spacer, Text } from '@chakra-ui/react';
 import { Icon as PhosphorIcon } from '@phosphor-icons/react';
 import { ReactNode, useEffect, useState } from 'react';
+import { Address } from 'viem';
 import { CONTENT_MAXW } from '../../../../constants/common';
 import { DAO_ROUTES } from '../../../../constants/routes';
 import { createAccountSubstring } from '../../../../hooks/utils/useDisplayName';
@@ -11,7 +12,7 @@ import Divider from '../../utils/Divider';
 import Breadcrumbs, { Crumb } from './Breadcrumbs';
 interface PageHeaderProps {
   title?: string;
-  address?: string;
+  address?: Address;
   breadcrumbs: Crumb[];
   hasDAOLink?: boolean;
   buttonVariant?: 'text' | 'secondary';

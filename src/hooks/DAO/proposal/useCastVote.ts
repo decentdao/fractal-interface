@@ -1,8 +1,11 @@
+import { abis } from '@fractal-framework/fractal-contracts';
 import snapshot from '@snapshot-labs/snapshot.js';
 import { ethers } from 'ethers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
+import { getContract } from 'viem';
+import { useWalletClient } from 'wagmi';
 import { useVoteContext } from '../../../components/Proposals/ProposalVotes/context/VoteContext';
 import { logError } from '../../../helpers/errorLogging';
 import { useFractal } from '../../../providers/App/AppProvider';
@@ -14,7 +17,6 @@ import {
   ExtendedSnapshotProposal,
 } from '../../../types';
 import encryptWithShutter from '../../../utils/shutter';
-import useSafeContracts from '../../safe/useSafeContracts';
 import { useTransaction } from '../../utils/useTransaction';
 import useSnapshotSpaceName from '../loaders/snapshot/useSnapshotSpaceName';
 import useUserERC721VotingTokens from './useUserERC721VotingTokens';
@@ -32,14 +34,13 @@ const useCastVote = ({
   const [snapshotWeightedChoice, setSnapshotWeightedChoice] = useState<number[]>([]);
 
   const {
-    governanceContracts: { ozLinearVotingContractAddress, erc721LinearVotingContractAddress },
+    governanceContracts: { linearVotingErc20Address, linearVotingErc721Address },
     governance,
     node: { daoSnapshotENS },
     readOnly: {
       user: { address },
     },
   } = useFractal();
-  const baseContracts = useSafeContracts();
   const daoSnapshotSpaceName = useSnapshotSpaceName();
   const signer = useEthersSigner();
   const client = useMemo(() => {
@@ -52,18 +53,18 @@ const useCastVote = ({
   const azoriusGovernance = useMemo(() => governance as AzoriusGovernance, [governance]);
   const { type } = azoriusGovernance;
 
-  const [contractCallCastVote, contractCallPending] = useTransaction();
+  const [contractCall, pending] = useTransaction();
 
   const { remainingTokenIds, remainingTokenAddresses } = useUserERC721VotingTokens(
+    null,
     proposal.proposalId,
   );
   const { getCanVote, getHasVoted } = useVoteContext();
+  const { data: walletClient } = useWalletClient();
 
-  useEffect(() => {
-    if (setPending) {
-      setPending(contractCallPending);
-    }
-  }, [setPending, contractCallPending]);
+  if (setPending) {
+    setPending(pending);
+  }
 
   useEffect(() => {
     if (extendedSnapshotProposal) {
@@ -85,34 +86,42 @@ const useCastVote = ({
 
   const castVote = useCallback(
     async (vote: number) => {
-      let contractFn;
-      if (type === GovernanceType.AZORIUS_ERC20 && ozLinearVotingContractAddress && baseContracts) {
-        const ozLinearVotingContract = baseContracts.linearVotingMasterCopyContract.asSigner.attach(
-          ozLinearVotingContractAddress,
-        );
-        contractFn = () => ozLinearVotingContract.vote(proposal.proposalId, vote);
+      if (type === GovernanceType.AZORIUS_ERC20 && linearVotingErc20Address && walletClient) {
+        const ozLinearVotingContract = getContract({
+          abi: abis.LinearERC20Voting,
+          address: linearVotingErc20Address,
+          client: walletClient,
+        });
+        contractCall({
+          contractFn: () => ozLinearVotingContract.write.vote([Number(proposal.proposalId), vote]),
+          pendingMessage: t('pendingCastVote'),
+          failedMessage: t('failedCastVote'),
+          successMessage: t('successCastVote'),
+          successCallback: () => {
+            setTimeout(() => {
+              getHasVoted();
+              getCanVote(true);
+            }, 3000);
+          },
+        });
       } else if (
         type === GovernanceType.AZORIUS_ERC721 &&
-        erc721LinearVotingContractAddress &&
-        baseContracts
+        linearVotingErc721Address &&
+        walletClient
       ) {
-        const erc721LinearVotingContract =
-          baseContracts.linearVotingERC721MasterCopyContract.asSigner.attach(
-            erc721LinearVotingContractAddress,
-          );
-
-        contractFn = () =>
-          erc721LinearVotingContract.vote(
-            proposal.proposalId,
-            vote,
-            remainingTokenAddresses,
-            remainingTokenIds,
-          );
-      }
-
-      if (contractFn) {
-        contractCallCastVote({
-          contractFn,
+        const erc721LinearVotingContract = getContract({
+          abi: abis.LinearERC721Voting,
+          address: linearVotingErc721Address,
+          client: walletClient,
+        });
+        contractCall({
+          contractFn: () =>
+            erc721LinearVotingContract.write.vote([
+              Number(proposal.proposalId),
+              vote,
+              remainingTokenAddresses,
+              remainingTokenIds.map(i => BigInt(i)),
+            ]),
           pendingMessage: t('pendingCastVote'),
           failedMessage: t('failedCastVote'),
           successMessage: t('successCastVote'),
@@ -126,17 +135,17 @@ const useCastVote = ({
       }
     },
     [
-      contractCallCastVote,
-      t,
-      ozLinearVotingContractAddress,
-      erc721LinearVotingContractAddress,
-      type,
-      proposal,
-      remainingTokenAddresses,
-      remainingTokenIds,
+      contractCall,
+      linearVotingErc721Address,
       getCanVote,
       getHasVoted,
-      baseContracts,
+      linearVotingErc20Address,
+      proposal.proposalId,
+      remainingTokenAddresses,
+      remainingTokenIds,
+      t,
+      type,
+      walletClient,
     ],
   );
 

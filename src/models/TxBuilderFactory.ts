@@ -1,15 +1,12 @@
-import { ethers } from 'ethers';
-import { getAddress } from 'viem';
-import { GnosisSafeL2 } from '../assets/typechain-types/usul/@gnosis.pm/safe-contracts/contracts';
-import { GnosisSafeL2__factory } from '../assets/typechain-types/usul/factories/@gnosis.pm/safe-contracts/contracts';
+import { Address, PublicClient, getContract } from 'viem';
+import GnosisSafeL2Abi from '../assets/abi/GnosisSafeL2';
+import GnosisSafeProxyFactoryAbi from '../assets/abi/GnosisSafeProxyFactory';
 import { getRandomBytes } from '../helpers';
 import {
-  BaseContracts,
   SafeMultisigDAO,
   SafeTransaction,
   SubDAO,
   AzoriusERC721DAO,
-  AzoriusContracts,
   AzoriusERC20DAO,
   VotingStrategyType,
 } from '../types';
@@ -24,47 +21,102 @@ export class TxBuilderFactory extends BaseTxBuilder {
   private readonly saltNum: bigint;
 
   // Safe Data
-  public predictedSafeAddress: string | undefined;
+  public predictedSafeAddress: Address | undefined;
   public createSafeTx: SafeTransaction | undefined;
-  private safeContract: GnosisSafeL2 | undefined;
-  public fallbackHandler: string;
+  private safeContractAddress: Address | undefined;
+  private compatibilityFallbackHandler: Address;
+  private votesErc20WrapperMasterCopy: Address;
+  private votesErc20MasterCopy: Address;
+  private keyValuePairs: Address;
+  private fractalRegistry: Address;
+  private gnosisSafeProxyFactory: Address;
+  private gnosisSafeProxy: Address;
+  private zodiacModuleProxyFactory: Address;
+  private freezeGuardAzoriusMasterCopy: Address;
+  private freezeGuardMultisigMasterCopy: Address;
+  private freezeVotingErc20MasterCopy: Address;
+  private freezeVotingErc721MasterCopy: Address;
+  private freezeVotingMultisigMasterCopy: Address;
+  private multiSendCallOnly: Address;
+  private claimErc20MasterCopy: Address;
+  private moduleFractalMasterCopy: Address;
+  private linearVotingErc20MasterCopy: Address;
+  private linearVotingErc721MasterCopy: Address;
+  private moduleAzoriusMasterCopy: Address;
 
   constructor(
-    signerOrProvider: ethers.Signer | any,
-    baseContracts: BaseContracts,
-    azoriusContracts: AzoriusContracts | undefined,
+    publicClient: PublicClient,
+    isAzorius: boolean,
     daoData: SafeMultisigDAO | AzoriusERC20DAO | AzoriusERC721DAO | SubDAO,
-    fallbackHandler: string,
-    parentAddress?: string,
-    parentTokenAddress?: string,
+    compatibilityFallbackHandler: Address,
+    votesErc20WrapperMasterCopy: Address,
+    votesErc20MasterCopy: Address,
+    keyValuePairs: Address,
+    fractalRegistry: Address,
+    gnosisSafeProxyFactory: Address,
+    gnosisSafeProxy: Address,
+    zodiacModuleProxyFactory: Address,
+    freezeGuardAzoriusMasterCopy: Address,
+    freezeGuardMultisigMasterCopy: Address,
+    freezeVotingErc20MasterCopy: Address,
+    freezeVotingErc721MasterCopy: Address,
+    freezeVotingMultisigMasterCopy: Address,
+    multiSendCallOnly: Address,
+    claimErc20MasterCopy: Address,
+    moduleFractalMasterCopy: Address,
+    linearVotingErc20MasterCopy: Address,
+    linearVotingErc721MasterCopy: Address,
+    moduleAzoriusMasterCopy: Address,
+    parentAddress?: Address,
+    parentTokenAddress?: Address,
   ) {
-    super(
-      signerOrProvider,
-      baseContracts,
-      azoriusContracts,
-      daoData,
-      parentAddress,
-      parentTokenAddress,
-    );
-
-    this.fallbackHandler = fallbackHandler;
+    super(publicClient, isAzorius, daoData, parentAddress, parentTokenAddress);
     this.saltNum = getRandomBytes();
+
+    this.compatibilityFallbackHandler = compatibilityFallbackHandler;
+    this.votesErc20WrapperMasterCopy = votesErc20WrapperMasterCopy;
+    this.votesErc20MasterCopy = votesErc20MasterCopy;
+    this.keyValuePairs = keyValuePairs;
+    this.fractalRegistry = fractalRegistry;
+    this.gnosisSafeProxyFactory = gnosisSafeProxyFactory;
+    this.gnosisSafeProxy = gnosisSafeProxy;
+    this.zodiacModuleProxyFactory = zodiacModuleProxyFactory;
+    this.freezeGuardAzoriusMasterCopy = freezeGuardAzoriusMasterCopy;
+    this.freezeGuardMultisigMasterCopy = freezeGuardMultisigMasterCopy;
+    this.freezeVotingErc20MasterCopy = freezeVotingErc20MasterCopy;
+    this.freezeVotingErc721MasterCopy = freezeVotingErc721MasterCopy;
+    this.freezeVotingMultisigMasterCopy = freezeVotingMultisigMasterCopy;
+    this.multiSendCallOnly = multiSendCallOnly;
+    this.claimErc20MasterCopy = claimErc20MasterCopy;
+    this.moduleFractalMasterCopy = moduleFractalMasterCopy;
+    this.linearVotingErc20MasterCopy = linearVotingErc20MasterCopy;
+    this.linearVotingErc721MasterCopy = linearVotingErc721MasterCopy;
+    this.moduleAzoriusMasterCopy = moduleAzoriusMasterCopy;
   }
 
-  public setSafeContract(safeAddress: string) {
-    const safeContract = GnosisSafeL2__factory.connect(safeAddress, this.signerOrProvider);
-    this.safeContract = safeContract;
+  public setSafeContract(safeAddress: Address) {
+    this.safeContractAddress = safeAddress;
   }
 
   public async setupSafeData(): Promise<void> {
+    const safeProxyFactoryContract = getContract({
+      abi: GnosisSafeProxyFactoryAbi,
+      address: this.gnosisSafeProxyFactory,
+      client: this.publicClient,
+    });
+    const safeSingletonContract = getContract({
+      abi: GnosisSafeL2Abi,
+      address: this.gnosisSafeProxy,
+      client: this.publicClient,
+    });
     const { predictedSafeAddress, createSafeTx } = await safeData(
-      this.baseContracts.multiSendContract,
-      this.baseContracts.safeFactoryContract,
-      this.baseContracts.safeSingletonContract,
+      this.multiSendCallOnly,
+      safeProxyFactoryContract,
+      safeSingletonContract,
       this.daoData as SafeMultisigDAO,
       this.saltNum,
-      this.fallbackHandler,
-      !!this.azoriusContracts,
+      this.compatibilityFallbackHandler,
+      this.isAzorius,
     );
 
     this.predictedSafeAddress = predictedSafeAddress;
@@ -75,17 +127,21 @@ export class TxBuilderFactory extends BaseTxBuilder {
 
   public createDaoTxBuilder(
     parentStrategyType?: VotingStrategyType,
-    parentStrategyAddress?: string,
+    parentStrategyAddress?: Address,
   ): DaoTxBuilder {
     return new DaoTxBuilder(
-      this.signerOrProvider,
-      this.baseContracts,
-      this.azoriusContracts,
+      this.publicClient,
+      this.isAzorius,
       this.daoData,
       this.saltNum,
       this.createSafeTx!,
-      this.safeContract!,
+      this.safeContractAddress!,
       this,
+      this.keyValuePairs,
+      this.fractalRegistry,
+      this.zodiacModuleProxyFactory,
+      this.multiSendCallOnly,
+      this.moduleFractalMasterCopy,
       this.parentAddress,
       this.parentTokenAddress,
       parentStrategyType,
@@ -94,44 +150,55 @@ export class TxBuilderFactory extends BaseTxBuilder {
   }
 
   public createFreezeGuardTxBuilder(
-    azoriusAddress?: string,
-    strategyAddress?: string,
+    azoriusAddress?: Address,
+    strategyAddress?: Address,
     parentStrategyType?: VotingStrategyType,
-    parentStrategyAddress?: string, // User only with ERC-721 parent
+    parentStrategyAddress?: Address, // User only with ERC-721 parent
   ): FreezeGuardTxBuilder {
     return new FreezeGuardTxBuilder(
-      this.signerOrProvider,
-      this.baseContracts,
+      this.publicClient,
       this.daoData as SubDAO,
-      this.safeContract!,
+      this.safeContractAddress!,
       this.saltNum,
-      getAddress(this.parentAddress!),
-      this.parentTokenAddress ? getAddress(this.parentTokenAddress) : undefined,
-      this.azoriusContracts,
-      azoriusAddress ? getAddress(azoriusAddress) : undefined,
-      strategyAddress ? getAddress(strategyAddress) : undefined,
+      this.parentAddress!,
+      this.zodiacModuleProxyFactory,
+      this.freezeGuardAzoriusMasterCopy,
+      this.freezeGuardMultisigMasterCopy,
+      this.freezeVotingErc20MasterCopy,
+      this.freezeVotingErc721MasterCopy,
+      this.freezeVotingMultisigMasterCopy,
+      this.isAzorius,
+      this.parentTokenAddress,
+      azoriusAddress,
+      strategyAddress,
       parentStrategyType,
-      parentStrategyAddress ? getAddress(parentStrategyAddress) : undefined,
+      parentStrategyAddress,
     );
   }
 
   public createMultiSigTxBuilder(): MultisigTxBuilder {
     return new MultisigTxBuilder(
-      this.baseContracts,
+      this.multiSendCallOnly,
       this.daoData as SafeMultisigDAO,
-      this.safeContract!,
+      this.safeContractAddress!,
     );
   }
 
   public async createAzoriusTxBuilder(): Promise<AzoriusTxBuilder> {
     const azoriusTxBuilder = new AzoriusTxBuilder(
-      this.signerOrProvider,
-      this.baseContracts,
-      this.azoriusContracts!,
+      this.publicClient,
       this.daoData as AzoriusERC20DAO,
-      this.safeContract!,
-      this.parentAddress ? getAddress(this.parentAddress) : undefined,
-      this.parentTokenAddress ? getAddress(this.parentTokenAddress) : undefined,
+      this.safeContractAddress!,
+      this.votesErc20WrapperMasterCopy,
+      this.votesErc20MasterCopy,
+      this.zodiacModuleProxyFactory,
+      this.multiSendCallOnly,
+      this.claimErc20MasterCopy,
+      this.linearVotingErc20MasterCopy,
+      this.linearVotingErc721MasterCopy,
+      this.moduleAzoriusMasterCopy,
+      this.parentAddress,
+      this.parentTokenAddress,
     );
 
     await azoriusTxBuilder.init();

@@ -1,7 +1,7 @@
 import { Address, Hex } from 'viem';
 
 export interface DecodedTransaction {
-  target: string;
+  target: Address;
   value: string;
   function: string;
   parameterTypes: string[];
@@ -21,9 +21,9 @@ export interface SafePostTransaction
   extends Modify<
     SafeTransaction,
     {
-      safe: string;
+      safe: Address;
       contractTransactionHash: string;
-      sender: string;
+      sender: Address;
       signature: string;
       value: string;
     }
@@ -33,8 +33,8 @@ export interface SafeTransaction extends MetaTransaction {
   safeTxGas: string | number;
   baseGas: string | number;
   gasPrice: string | number;
-  gasToken: string;
-  refundReceiver: string;
+  gasToken: Address;
+  refundReceiver: Address;
   nonce: string | number;
 }
 export type DecodedTxParam = {
