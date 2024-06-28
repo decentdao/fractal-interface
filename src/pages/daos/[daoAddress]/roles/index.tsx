@@ -1,17 +1,32 @@
 import { Box, Show, Text } from '@chakra-ui/react';
 import { Pencil } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { zeroAddress } from 'viem';
 import { RoleCard } from '../../../../components/pages/Roles/RoleCard';
 import { RolesTable } from '../../../../components/pages/Roles/RolesTable';
 import { Card } from '../../../../components/ui/cards/Card';
 import { BarLoader } from '../../../../components/ui/loaders/BarLoader';
 import PageHeader from '../../../../components/ui/page/Header/PageHeader';
+import { DAO_ROUTES } from '../../../../constants/routes';
+import { useFractal } from '../../../../providers/App/AppProvider';
+import { useNetworkConfig } from '../../../../providers/NetworkConfig/NetworkConfigProvider';
 import { useRolesState } from '../../../../state/useRolesState';
 function Roles() {
   const { hatsTree } = useRolesState();
+  const { addressPrefix } = useNetworkConfig();
   const { t } = useTranslation(['roles', 'navigation', 'breadcrumbs', 'dashboard']);
+  const {
+    node: { daoAddress },
+  } = useFractal();
+  const navigate = useNavigate();
 
+  if (!daoAddress) return null;
+  const handleRoleClick = (roleIndex: number) => {
+    // @todo open role details drawer
+    // For Mobile, This is a new screen
+    return roleIndex; // @todo remove this line
+  };
   return (
     <Box>
       <PageHeader
@@ -29,8 +44,7 @@ function Roles() {
         buttonProps={{
           leftIcon: <Pencil />,
         }}
-        // @todo navigate to edit roles page
-        buttonClick={() => {}}
+        buttonClick={() => navigate(DAO_ROUTES.rolesEdit.relative(addressPrefix, daoAddress))}
       />
       {hatsTree === undefined && (
         <Card
@@ -52,20 +66,19 @@ function Roles() {
           </Text>
         </Card>
       )}
-      {/* {hatsTree && ( */}
       <Show above="md">
-        <RolesTable />
+        <RolesTable handleRoleClick={handleRoleClick} />
       </Show>
       <Show below="md">
-        {/* (Mocked) Role admin not set */}
         <RoleCard
           roleName="Admin"
           wearerAddress={undefined}
+          handleRoleClick={handleRoleClick}
         />
-        {/* (Mocked) Role set with streams */}
         <RoleCard
           roleName="CEO"
           wearerAddress={zeroAddress}
+          handleRoleClick={handleRoleClick}
           payrollData={{
             payrollAmount: '1000',
             payrollSchedule: 'mo',
@@ -92,6 +105,7 @@ function Roles() {
         <RoleCard
           roleName="Code Reviewer"
           wearerAddress={zeroAddress}
+          handleRoleClick={handleRoleClick}
           payrollData={{
             payrollAmount: '1',
             payrollSchedule: 'mo',
@@ -105,7 +119,6 @@ function Roles() {
           }}
         />
       </Show>
-      {/* )} */}
     </Box>
   );
 }

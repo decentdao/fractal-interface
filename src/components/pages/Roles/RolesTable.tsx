@@ -1,38 +1,14 @@
-import { Box, Flex, Image, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react';
+import { Box, Flex, Icon, Image, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react';
+import { Pencil } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import { Address, zeroAddress } from 'viem';
+import { zeroAddress } from 'viem';
 import { useGetDAOName } from '../../../hooks/DAO/useGetDAOName';
 import useAvatar from '../../../hooks/utils/useAvatar';
 import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
 import { getChainIdFromPrefix } from '../../../utils/url';
 import EtherscanLink from '../../ui/links/EtherscanLink';
 import Avatar from '../../ui/page/Header/Avatar';
-
-// @todo I imagine this interface can eventually be shared between the RoleCard and this component, for now keeping seperated
-export interface RoleRowProps {
-  roleName: string;
-  wearerAddress: Address | undefined;
-  vestingData?: {
-    vestingSchedule: string;
-    vestingAmount: string;
-    asset: {
-      address: string;
-      symbol: string;
-      name: string;
-      iconUri: string;
-    };
-  };
-  payrollData?: {
-    payrollSchedule: string;
-    payrollAmount: string;
-    asset: {
-      address: string;
-      symbol: string;
-      name: string;
-      iconUri: string;
-    };
-  };
-}
+import { EditBadgeStatus, RoleProps, RoleViewMode } from './types';
 
 export function RolesHeader() {
   const { t } = useTranslation(['roles']);
@@ -51,7 +27,6 @@ export function RolesHeader() {
       >
         <Th>{t('role')}</Th>
         <Th>{t('member')}</Th>
-        {/* @todo These values are viewed only by admin? */}
         <Th>{t('payroll')}</Th>
         <Th>{t('vesting')}</Th>
       </Tr>
@@ -59,7 +34,13 @@ export function RolesHeader() {
   );
 }
 
-export function RolesRow({ roleName, wearerAddress, payrollData, vestingData }: RoleRowProps) {
+export function RolesRow({
+  roleName,
+  wearerAddress,
+  payrollData,
+  vestingData,
+  mode = 'view',
+}: RoleProps) {
   const { addressPrefix } = useNetworkConfig();
   const { daoName: accountDisplayName } = useGetDAOName({
     address: wearerAddress || zeroAddress,
@@ -67,23 +48,41 @@ export function RolesRow({ roleName, wearerAddress, payrollData, vestingData }: 
   });
   const avatarURL = useAvatar(wearerAddress || zeroAddress);
   const { t } = useTranslation(['roles', 'daoCreate']);
+
   return (
     <Tr
-      minHeight="10rem"
       sx={{
         td: { padding: '0.75rem', height: '4rem' },
+        '&:hover': {
+          '.edit-role-icon': { opacity: 1 },
+        },
       }}
       _hover={{ bg: 'neutral-3' }}
       _active={{ bg: 'neutral-2', border: '1px solid', borderColor: 'neutral-3' }}
       transition="all ease-out 300ms"
     >
       <Td>
-        <Text
-          textStyle="body-base"
-          color="lilac-0"
+        <Flex
+          alignItems="center"
+          justifyContent="space-between"
         >
-          {roleName}
-        </Text>
+          <Text
+            textStyle="body-base"
+            color="lilac-0"
+          >
+            {roleName}
+          </Text>
+          {mode === 'edit' && (
+            <Icon
+              className="edit-role-icon"
+              as={Pencil}
+              color="white-0"
+              boxSize="1rem"
+              opacity={0}
+              transition="opacity 0.3s ease-out"
+            />
+          )}
+        </Flex>
       </Td>
       <Td>
         <Flex alignItems="center">
@@ -208,7 +207,13 @@ export function RolesRow({ roleName, wearerAddress, payrollData, vestingData }: 
   );
 }
 
-export function RolesTable() {
+export function RolesTable({
+  mode = 'view',
+  handleRoleClick,
+}: {
+  mode?: RoleViewMode;
+  handleRoleClick: (roleIndex: number) => void;
+}) {
   return (
     <Box
       overflow="hidden"
@@ -232,12 +237,23 @@ export function RolesTable() {
           }}
         >
           <RolesRow
+            mode={mode}
             roleName="Admin"
             wearerAddress={zeroAddress}
+            handleRoleClick={handleRoleClick}
           />
           <RolesRow
+            mode={mode}
+            roleName="Legal Counsel"
+            editStatus={EditBadgeStatus.Removed}
+            wearerAddress={zeroAddress}
+            handleRoleClick={handleRoleClick}
+          />
+          <RolesRow
+            mode={mode}
             roleName="CEO"
             wearerAddress={zeroAddress}
+            handleRoleClick={handleRoleClick}
             payrollData={{
               payrollAmount: '1000',
               payrollSchedule: 'mo',

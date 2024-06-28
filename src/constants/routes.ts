@@ -32,6 +32,11 @@ export const DAO_ROUTES = {
       `/roles${getDaoQueryParam(addressPrefix, daoAddress)}`,
     path: 'roles',
   },
+  rolesEdit: {
+    relative: (addressPrefix: string, daoAddress: string) =>
+      `/roles/edit${getDaoQueryParam(addressPrefix, daoAddress)}`,
+    path: 'roles/edit',
+  },
   treasury: {
     relative: (addressPrefix: string, daoAddress: string) =>
       `/treasury${getDaoQueryParam(addressPrefix, daoAddress)}`,
