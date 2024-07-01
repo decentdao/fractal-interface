@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
-import { useRolesState } from '../../../state/useRolesState';
+import { DecentHatsError, useRolesState } from '../../../state/useRolesState';
 import { useHatsSubgraphClient } from './useHatsSubgraphClient';
 
 const useHatsTree = () => {
@@ -36,12 +37,20 @@ const useHatsTree = () => {
         },
       })
       .then(tree => {
-        setHatsTree(tree);
+        try {
+          setHatsTree(tree);
+        } catch (e) {
+          if (e instanceof DecentHatsError) {
+            toast(e.message);
+          }
+        }
       })
       .catch(() => {
         setHatsTree(undefined);
+        const message = 'Hats Tree ID is not valid';
+        toast(message);
         console.error({
-          message: 'hatsTreeId is not valid',
+          message,
           args: {
             network: chain.id,
             hatsTreeId: hatsTreeId,

@@ -1,7 +1,7 @@
 import { Box, Flex, Icon, Image, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react';
 import { Pencil } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import { zeroAddress } from 'viem';
+import { getAddress, zeroAddress } from 'viem';
 import { useGetDAOName } from '../../../hooks/DAO/useGetDAOName';
 import useAvatar from '../../../hooks/utils/useAvatar';
 import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
@@ -40,10 +40,12 @@ export function RolesRow({
   payrollData,
   vestingData,
   mode = 'view',
+  handleRoleClick,
+  hatId,
 }: RoleProps) {
   const { addressPrefix } = useNetworkConfig();
   const { daoName: accountDisplayName } = useGetDAOName({
-    address: wearerAddress || zeroAddress,
+    address: getAddress(wearerAddress || zeroAddress),
     chainId: getChainIdFromPrefix(addressPrefix),
   });
   const avatarURL = useAvatar(wearerAddress || zeroAddress);
@@ -60,6 +62,7 @@ export function RolesRow({
       _hover={{ bg: 'neutral-3' }}
       _active={{ bg: 'neutral-2', border: '1px solid', borderColor: 'neutral-3' }}
       transition="all ease-out 300ms"
+      onClick={() => handleRoleClick(hatId)}
     >
       <Td>
         <Flex
@@ -212,7 +215,7 @@ export function RolesTable({
   handleRoleClick,
 }: {
   mode?: RoleViewMode;
-  handleRoleClick: (roleIndex: number) => void;
+  handleRoleClick: (hatId: number) => void;
 }) {
   return (
     <Box
@@ -237,12 +240,14 @@ export function RolesTable({
           }}
         >
           <RolesRow
+            hatId={0}
             mode={mode}
             roleName="Admin"
             wearerAddress={zeroAddress}
             handleRoleClick={handleRoleClick}
           />
           <RolesRow
+            hatId={1}
             mode={mode}
             roleName="Legal Counsel"
             editStatus={EditBadgeStatus.Removed}
@@ -250,6 +255,7 @@ export function RolesTable({
             handleRoleClick={handleRoleClick}
           />
           <RolesRow
+            hatId={2}
             mode={mode}
             roleName="CEO"
             wearerAddress={zeroAddress}

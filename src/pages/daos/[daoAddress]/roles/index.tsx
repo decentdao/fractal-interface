@@ -42,6 +42,7 @@ function Roles() {
         buttonVariant="secondary"
         buttonText={t('editRoles')}
         buttonProps={{
+          size: 'sm',
           leftIcon: <Pencil />,
         }}
         buttonClick={() => navigate(DAO_ROUTES.rolesEdit.relative(addressPrefix, daoAddress))}
@@ -71,11 +72,13 @@ function Roles() {
       </Show>
       <Show below="md">
         <RoleCard
+          hatId={0}
           roleName="Admin"
           wearerAddress={undefined}
           handleRoleClick={handleRoleClick}
         />
         <RoleCard
+          hatId={1}
           roleName="CEO"
           wearerAddress={zeroAddress}
           handleRoleClick={handleRoleClick}
@@ -104,6 +107,7 @@ function Roles() {
         />
         <RoleCard
           roleName="Code Reviewer"
+          hatId={2}
           wearerAddress={zeroAddress}
           handleRoleClick={handleRoleClick}
           payrollData={{

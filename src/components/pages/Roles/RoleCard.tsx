@@ -1,7 +1,7 @@
 import { Box, Flex, Icon, Image, Text } from '@chakra-ui/react';
 import { CaretRight } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import { zeroAddress } from 'viem';
+import { getAddress, zeroAddress } from 'viem';
 import { useGetDAOName } from '../../../hooks/DAO/useGetDAOName';
 import useAvatar from '../../../hooks/utils/useAvatar';
 import { useNetworkConfig } from '../../../providers/NetworkConfig/NetworkConfigProvider';
@@ -19,16 +19,18 @@ export function RoleCard({
   vestingData,
   mode,
   editStatus,
+  handleRoleClick,
+  hatId,
 }: RoleProps) {
   const { addressPrefix } = useNetworkConfig();
   const { daoName: accountDisplayName } = useGetDAOName({
-    address: wearerAddress || zeroAddress,
+    address: getAddress(wearerAddress || zeroAddress),
     chainId: getChainIdFromPrefix(addressPrefix),
   });
   const avatarURL = useAvatar(wearerAddress || zeroAddress);
   const { t } = useTranslation(['roles']);
   return (
-    <Card mb="1rem">
+    <Card mb="1rem" onClick={() => handleRoleClick(hatId)}>
       <Flex justifyContent="space-between">
         <Flex alignItems="center">
           {wearerAddress ? (
