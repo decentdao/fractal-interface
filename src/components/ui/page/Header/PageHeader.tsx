@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Icon, IconButton, Spacer, Text } from '@chakra-ui/react';
+import { Box, Button, ButtonProps, Flex, Icon, IconButton, Spacer, Text } from '@chakra-ui/react';
 import { Icon as PhosphorIcon } from '@phosphor-icons/react';
 import { ReactNode, useEffect, useState } from 'react';
 import { CONTENT_MAXW } from '../../../../constants/common';
@@ -14,11 +14,15 @@ interface PageHeaderProps {
   address?: string;
   breadcrumbs: Crumb[];
   hasDAOLink?: boolean;
+  // @todo remove buttonVariant in favor of using buttonProps
   buttonVariant?: 'text' | 'secondary';
   ButtonIcon?: PhosphorIcon;
   buttonText?: string;
+  // @todo remove buttonClick in favor of using buttonProps
   buttonClick?: () => void;
   buttonTestId?: string;
+  buttonProps?: ButtonProps;
+  // @todo remove isButtonDisabled in favor of using buttonProps
   isButtonDisabled?: boolean;
   children?: ReactNode;
 }
@@ -37,6 +41,7 @@ function PageHeader({
   buttonClick,
   buttonTestId,
   isButtonDisabled,
+  buttonProps,
   children,
 }: PageHeaderProps) {
   const {
@@ -84,6 +89,7 @@ function PageHeader({
                 data-testid={buttonTestId}
                 variant={buttonVariant}
                 isDisabled={isButtonDisabled}
+                {...buttonProps}
               >
                 {buttonText}
               </Button>
@@ -102,6 +108,7 @@ function PageHeader({
                 size="icon-sm"
                 data-testid={buttonTestId}
                 isDisabled={isButtonDisabled}
+                {...buttonProps}
                 as={Button}
               >
                 {buttonText}

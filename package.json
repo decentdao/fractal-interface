@@ -14,6 +14,7 @@
     "@fontsource/space-mono": "^5.0.19",
     "@fractal-framework/fractal-contracts": "^0.7.1",
     "@graphprotocol/client-apollo": "^1.0.16",
+    "@hatsprotocol/sdk-v1-subgraph": "^1.0.0",
     "@lido-sdk/contracts": "^3.0.2",
     "@netlify/blobs": "^6.5.0",
     "@netlify/functions": "^2.6.0",
@@ -56,7 +57,8 @@
     "vite": "^5.1.0",
     "vite-plugin-checker": "^0.6.4",
     "wagmi": "^2.9.7",
-    "yup": "^1"
+    "yup": "^1",
+    "zustand": "^4.5.2"
   },
   "scripts": {
     "lint": "eslint . --ext .ts,.tsx --fix",

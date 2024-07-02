@@ -16,6 +16,7 @@ import CreateProposalTemplatePage from './pages/daos/[daoAddress]/proposal-templ
 import ProposalsPage from './pages/daos/[daoAddress]/proposals';
 import ProposalDetailsPage from './pages/daos/[daoAddress]/proposals/[proposalId]';
 import ProposalCreatePage from './pages/daos/[daoAddress]/proposals/new';
+import Roles from './pages/daos/[daoAddress]/roles';
 import Treasury from './pages/daos/[daoAddress]/treasury';
 import HomePage from './pages/home/HomePage';
 
@@ -49,7 +50,7 @@ export const router = (addressPrefix: string) =>
           element: <DAOController />,
           children: [
             {
-              path: 'home',
+              path: DAO_ROUTES.dao.path,
               element: <DaoDashboardPage />,
             },
             {
@@ -63,8 +64,12 @@ export const router = (addressPrefix: string) =>
                 redirect(DAO_ROUTES.modifyGovernance.relative(addressPrefix, daoAddress)),
             },
             {
-              path: 'hierarchy',
+              path: DAO_ROUTES.hierarchy.path,
               element: <HierarchyPage />,
+            },
+            {
+              path: DAO_ROUTES.roles.path,
+              element: <Roles />,
             },
             {
               path: 'new/*',
@@ -96,7 +101,7 @@ export const router = (addressPrefix: string) =>
               ],
             },
             {
-              path: 'proposals',
+              path: DAO_ROUTES.proposals.path,
               children: [
                 {
                   index: true,
@@ -119,11 +124,11 @@ export const router = (addressPrefix: string) =>
               ],
             },
             {
-              path: 'settings',
+              path: DAO_ROUTES.settings.path,
               element: <SettingsPage />,
             },
             {
-              path: 'treasury',
+              path: DAO_ROUTES.treasury.path,
               element: <Treasury />,
             },
           ],

@@ -8,6 +8,7 @@ import {
   Question,
   DiscordLogo,
   BookOpen,
+  UsersThree,
 } from '@phosphor-icons/react';
 import { DAO_ROUTES } from '../../../../constants/routes';
 import { URL_FAQ, URL_DISCORD, URL_DOCS } from '../../../../constants/url';
@@ -93,6 +94,14 @@ function InternalLinks({ closeDrawer }: { closeDrawer?: () => void }) {
           labelKey="dashboard"
           testId="navigation-dashboardLink"
           NavigationIcon={House}
+          scope="internal"
+          closeDrawer={closeDrawer}
+        />
+        <NavigationLink
+          href={DAO_ROUTES.roles.relative(addressPrefix, daoAddress)}
+          labelKey="roles"
+          testId="navigation-rolesLink"
+          NavigationIcon={UsersThree}
           scope="internal"
           closeDrawer={closeDrawer}
         />

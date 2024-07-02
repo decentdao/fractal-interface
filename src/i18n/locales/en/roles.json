@@ -1,0 +1,11 @@
+{
+  "roles": "Roles",
+  "role": "Role",
+  "member": "Member",
+  "noRoles": "You haven’t added any Roles yet. Create one above.",
+  "unassigned": "Unassigned",
+  "after": "after",
+  "payroll": "Payroll",
+  "vesting": "Vesting",
+  "editRoles": "Edit Roles"
+}

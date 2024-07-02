@@ -3,6 +3,7 @@
   "proposals": "All Proposals",
   "proposalNew": "New Proposal",
   "nodes": "Organization",
+  "roles": "Roles",
   "treasury": "Treasury",
   "proposal": "#{{proposalId}} {{proposalTitle}}",
   "proposalTemplates": "Proposal Templates",

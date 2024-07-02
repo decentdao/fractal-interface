@@ -15,6 +15,7 @@ import NAVIGATION_EN from './locales/en/navigation.json';
 import PROPOSAL_EN from './locales/en/proposal.json';
 import PROPOSAL_METADATA_EN from './locales/en/proposalMetadata.json';
 import PROPOSAL_TEMPLATE_EN from './locales/en/proposalTemplate.json';
+import ROLES_EN from './locales/en/roles.json';
 import SETTINGS_EN from './locales/en/settings.json';
 import STAKE_EN from './locales/en/stake.json';
 import TRANSACTION_EN from './locales/en/transaction.json';
@@ -60,6 +61,7 @@ export const supportedLanguages = {
     settings: SETTINGS_EN,
     stake: STAKE_EN,
     home: HOME_EN,
+    roles: ROLES_EN,
   },
 };
 
